@@ -1,0 +1,3 @@
+mol = loadmol2 template.mol2
+loadamberparams template.frcmod
+saveamberparm mol template.prmtop template.inpcrd
