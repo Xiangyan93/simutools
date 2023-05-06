@@ -135,10 +135,12 @@ class GROMACS:
         cmd = f'{self.gmx_analysis} -quiet -nobackup grompp -f {mdp} -c {gro} -p {top} -o {tpr} -maxwarn {maxwarn}'
         execute(cmd)
 
-    def mdrun(self, tpr: str, ntomp: int = None):
+    def mdrun(self, tpr: str, ntmpi: int = None, ntomp: int = None):
         assert os.path.exists(tpr), f'{tpr} not exists.'
         name = tpr.split('.')[0]
         cmd = f'{self.gmx_analysis} -quiet -nobackup mdrun -v -deffnm {name}'
+        if ntmpi is not None:
+            cmd += f' -ntmpi {ntmpi}'
         if ntomp is not None:
             cmd += f' -ntomp {ntomp}'
         execute(cmd)

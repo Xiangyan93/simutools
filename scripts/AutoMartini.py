@@ -30,7 +30,10 @@ class CommonArgs(Tap):
     """dihedral index with periodicity of 180 degrees"""
     dihedral_n3: List[int] = None
     """dihedral index with periodicity of 120 degrees"""
+    ntmpi: int = None
+    """number of MPI threads for gmx"""
     ntomp: int = None
+    """number of OpenMP threads for gmx"""
     n_iter: int = 1
 
     @property
@@ -58,16 +61,16 @@ def main(args: CommonArgs):
 
         gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
         gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'{args.name}.top', tpr='em.tpr')
-        gmx.mdrun(tpr='em.tpr', ntomp=args.ntomp)
+        gmx.mdrun(tpr='em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
         gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq.mdp', nsteps=200000, dt=0.002)
         gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'{args.name}.top', tpr='eq.tpr')
-        gmx.mdrun(tpr='eq.tpr', ntomp=args.ntomp)
+        gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=100,
                                        restart=True)
         gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'{args.name}.top', tpr='run.tpr')
-        gmx.mdrun(tpr='run.tpr', ntomp=args.ntomp)
+        gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
         gmx.trjconv(gro='run.xtc', out_gro='AA-traj.whole.xtc', tpr='run.tpr', pbc_whole=True)
     elif args.action == 'cg-mapping':
         """ Using gromacs
@@ -151,13 +154,13 @@ def main(args: CommonArgs):
             shutil.copy(f'../CG_{args.name}.top', f'..')
             # GROMACS simulation: energy minimization, equilibirum, and production.
             gmx.grompp(gro='../CG_initial.gro', mdp='../CG_em.mdp', top=f'CG_{args.name}.top', tpr=f'CG_em_{i}.tpr')
-            gmx.mdrun(tpr=f'CG_em_{i}.tpr', ntomp=args.ntomp)
+            gmx.mdrun(tpr=f'CG_em_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
             gmx.grompp(gro=f'CG_em_{i}.gro', mdp='../CG_eq.mdp', top=f'CG_{args.name}.top', tpr=f'CG_eq_{i}.tpr',
                        maxwarn=2)
-            gmx.mdrun(tpr=f'CG_eq_{i}.tpr', ntomp=args.ntomp)
+            gmx.mdrun(tpr=f'CG_eq_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
             gmx.grompp(gro=f'CG_eq_{i}.gro', mdp='../CG_run.mdp', top=f'CG_{args.name}.top', tpr=f'CG_run_{i}.tpr',
                        maxwarn=1)
-            gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntomp=args.ntomp)
+            gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
             gmx.trjconv(gro=f'CG_run_{i}.xtc', out_gro=f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr', pbc_whole=True)
 
             mapping.load_cg_traj(f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr')
