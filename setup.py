@@ -22,9 +22,11 @@ long_description = read('README.md')
 setuptools.setup(
     name='simutools',
     version=__version__,
-    python_requires='>=3.10',
+    python_requires='>=3.8',
     install_requires=[
-
+        'typed-argument-parser',
+        'rdkit',
+        'mdanalysis',
     ],
     author='Yan Xiang',
     author_email='1993.xiangyan@gmail.com',
