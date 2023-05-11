@@ -20,16 +20,12 @@ class CommonArgs(Tap):
     """The name of the molecule. default = save_dir"""
     res_name: str = None
     """residual name"""
-    smiles: str
+    smiles: str = None
     """SMILES of the molecule."""
     action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg']
     """action to be conducted."""
-    dihedral_n1: List[int] = None
-    """dihedral index with periodicity of 360 degrees"""
-    dihedral_n2: List[int] = None
-    """dihedral index with periodicity of 180 degrees"""
-    dihedral_n3: List[int] = None
-    """dihedral index with periodicity of 120 degrees"""
+    dihedral_n1_180: List[int] = []
+    """dihedral index with periodicity of 360 degrees and balanced angle of 180 degrees"""
     ntmpi: int = None
     """number of MPI threads for gmx"""
     ntomp: int = None
@@ -51,6 +47,7 @@ def main(args: CommonArgs):
     cd_and_mkdir(args.save_dir)
     gmx = GROMACS(gmx_exe_mdrun='gmx')
     if args.action == 'all-atom':
+        assert args.smiles is not None
         cd_and_mkdir('1.all-atom')
         amber = AMBER()
         amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, resName=args.res_name)
@@ -73,40 +70,6 @@ def main(args: CommonArgs):
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
         gmx.trjconv(gro='run.xtc', out_gro='AA-traj.whole.xtc', tpr='run.tpr', pbc_whole=True)
     elif args.action == 'cg-mapping':
-        """ Using gromacs
-        mol2 = f'{args.name}_ob.mol2'
-        mapping = Mapping(mol2=mol2)
-        mapping.group()
-        mapping.generate_ndx_mapping(f'{args.name}.ndx')
-        mapping.generate_itp(f'{args.name}_CG.itp', resName=args.res_name, atom_only=True)
-        gmx.generate_top(f'{args.name}_CG.top', include_itps=['../simutools/template/martini_v3.0.0.itp',
-                                                              f'{args.name}_CG.itp'],
-                         resName=args.res_name)
-        gmx.trjconv(gro='run.xtc', out_gro='AA-traj.whole.xtc', tpr='run.tpr', pbc_whole=True)
-        gmx.traj(gro='AA-traj.whole.xtc', tpr='run.tpr', out_gro='mapped.xtc', ng=len(mapping.groups),
-                 ndx=f'{args.name}.ndx', select=' '.join(list(map(str, range(len(mapping.groups))))))
-        # create CG tpr
-        gmx.traj(gro='AA-traj.whole.xtc', tpr='run.tpr', out_gro='molecule.gro', ng=len(mapping.groups),
-                 ndx=f'{args.name}.ndx', select=' '.join(list(map(str, range(len(mapping.groups))))), end_time=0)
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'martini.mdp', nsteps=10000000, dt=0.02, nstxtcout=1000,
-                                       restart=True,
-                                       tcoupl='v-rescale', tau_t='1.0',
-                                       pcoupl='parrinello-rahman', tau_p='12.0',
-                                       compressibility='3e-4', constraints='none', coulombtype='cutoff', rcoulomb='1.1',
-                                       rvdw='1.1', dielectric=15, nstlist=20)
-        gmx.grompp(gro='molecule.gro', mdp='martini.mdp', top=f'{args.name}_CG.top', tpr='CG.tpr', maxwarn=1)
-        for i, bond in enumerate(mapping.cg_graph.edges):
-            gmx.distance(gro='mapped.xtc', tpr='CG.tpr', ndx='bonds.ndx', select=f'{i}')
-            gmx.analyze(f'bond_{i}.xvg', dist=f'dist_bond_{i}.xvg')
-
-        for i, angle in enumerate(mapping.cg_angles_idx):
-            gmx.angle(gro='mapped.xtc', ndx='angles.ndx', select=f'{i}')
-            gmx.analyze(f'angle_{i}.xvg', dist=f'dist_angle_{i}.xvg', bw=1.0)
-
-        for i, dihedral in enumerate(mapping.cg_dihedral_idx):
-            gmx.angle(t='dihedral', gro='mapped.xtc', ndx='dihedrals.ndx', select=f'{i}')
-            gmx.analyze(f'dihedral_{i}.xvg', dist=f'dist_dihedral_{i}.xvg', bw=1.0)
-        """
         cd_and_mkdir('2.cg-mapping')
         # use MDAnalysis
         if os.path.exists('temp.pkl'):
@@ -119,7 +82,7 @@ def main(args: CommonArgs):
             mapping.generate_ndx_mapping(f'{args.name}.ndx')
             mapping.load_aa_traj('../1.all-atom/AA-traj.whole.xtc', '../1.all-atom/run.tpr')
             mapping.save(filename='temp.pkl')
-        mapping.get_aa_distribution()
+        mapping.get_aa_distribution(dihedral_n1_180=args.dihedral_n1_180)
         mapping.write_distribution(file='aa-distribution.svg', CG=False, fit=True)
         # mapping.generate_itp(f'CG_{args.name}.itp', resName=args.res_name)
         # mapping.generate_gro(file=f'CG_{args.name}.gro', resName=args.res_name, box_length=3.8)
@@ -131,7 +94,7 @@ def main(args: CommonArgs):
         gmx.generate_top(f'CG_{args.name}.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
                                                               f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',
                                                               f'CG_{args.name}.itp'],
-                         resName=args.res_name)
+                         mol_name=[args.res_name], mol_number=[1])
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=10000, dt=0.005,
                                        tcoupl='v-rescale', tau_t='1.0',
@@ -151,7 +114,7 @@ def main(args: CommonArgs):
             cd_and_mkdir(f'iteration_{i}')
             mapping.generate_itp(f'CG_{args.name}_{i}.itp', resName=args.res_name)
             shutil.copy(f'CG_{args.name}_{i}.itp', f'CG_{args.name}.itp')
-            shutil.copy(f'../CG_{args.name}.top', f'..')
+            shutil.copy(f'../CG_{args.name}.top', f'.')
             # GROMACS simulation: energy minimization, equilibirum, and production.
             gmx.grompp(gro='../CG_initial.gro', mdp='../CG_em.mdp', top=f'CG_{args.name}.top', tpr=f'CG_em_{i}.tpr')
             gmx.mdrun(tpr=f'CG_em_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
@@ -164,11 +127,12 @@ def main(args: CommonArgs):
             gmx.trjconv(gro=f'CG_run_{i}.xtc', out_gro=f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr', pbc_whole=True)
 
             mapping.load_cg_traj(f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr')
+            mapping.write_distribution(file='distribution_CG.svg', CG=False, fit=False)
             mapping.update_parameter()
             mapping.write_distribution(CG=True)
             for bead in mapping.groups:
                 bead.position = None
-            os.chdir('../..')
+            os.chdir('..')
     elif args.action == 'swarm-cg':
         cd_and_mkdir('3.swarm-cg')
         mapping = Mapping.load(path='../2.cg-mapping')
@@ -177,7 +141,7 @@ def main(args: CommonArgs):
         gmx.generate_top(f'CG_{args.name}.top', include_itps=[f'../../simutools/template/martini_v3.0.0.itp',
                                                               f'../../simutools/template/martini_v3.0.0_solvents_v1.itp',
                                                               f'CG_{args.name}.itp'],
-                         resName=args.res_name)
+                         mol_name=[args.res_name], mol_number=[1])
         mapping.generate_gro(file=f'CG_{args.name}.gro', resName=args.res_name, box_length=3.8)
         gmx.solvate(f'CG_{args.name}.gro', top=f'CG_{args.name}.top', outgro='CG_initial.gro',
                     solvent=f'{TEMPLATE_DIR}/box_martini3_water.gro')
@@ -191,7 +155,7 @@ def main(args: CommonArgs):
         gmx.generate_top(f'CG_{args.name}.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
                                                               f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',
                                                               f'CG_{args.name}.itp'],
-                         resName=args.res_name)
+                         mol_name=[args.res_name], mol_number=[1])
         gmx.solvate(f'CG_{args.name}.gro', top=f'CG_{args.name}.top', outgro='CG_initial.gro',
                     solvent=f'{TEMPLATE_DIR}/box_martini3_water.gro')
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)

@@ -27,9 +27,9 @@ class Bond:
             for ring_idx in self.bead1.raw_rings_idx:
                 if set(ring_idx) in [set(g) for g in self.bead2.raw_rings_idx]:
                     return True
-            return False
-        else:
-            return False
+        elif self.bead1.IsSugar and self.bead2.IsSugar:
+            return True
+        return False
 
     @property
     def n_iter(self) -> int:

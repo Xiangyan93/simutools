@@ -53,30 +53,24 @@ def merge_lists(list_of_lists):
     if not list_of_lists:
         return []
 
+    g = nx.Graph()
+    for i, l in enumerate(list_of_lists):
+        g.add_node(i)
+
+    for i, l1 in enumerate(list_of_lists):
+        for j in range(i+1, len(list_of_lists)):
+            l2 = list_of_lists[j]
+            if set(l1).intersection(l2):
+                g.add_edge(i, j)
+
     merged_lists = []
     raw_merged_lists = []
-    visited = set()
-
-    for i in range(len(list_of_lists)):
-        if i in visited:
-            continue
-
-        merged_list = set(list_of_lists[i])
-        raw_merged_lists.append([])
-        raw_merged_lists[-1].append(list_of_lists[i])
-        visited.add(i)
-
-        for j in range(i+1, len(list_of_lists)):
-            if j in visited:
-                continue
-
-            if any(elem in merged_list for elem in list_of_lists[j]):
-                merged_list.update(list_of_lists[j])
-                raw_merged_lists[-1].append(list_of_lists[j])
-                visited.add(j)
-
-        merged_lists.append(list(merged_list))
-
+    for idx in list(nx.connected_components(g)):
+        _ = []
+        for i in idx:
+            _ += list_of_lists[i]
+        merged_lists.append(list(set(_)))
+        raw_merged_lists.append([list_of_lists[i] for i in idx])
     return merged_lists, raw_merged_lists
 
 

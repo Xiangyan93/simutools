@@ -14,11 +14,11 @@ import warnings
 from itertools import permutations
 import matplotlib.pyplot as plt
 from ..utils import mol_to_nx, merge_lists
-from .bead import Bead
+from .bead import Bead, VirtualSite
 from .bond import Bond
 from .angle import Angle
 from .dihedral import Dihedral
-from .martini3bible import martini3bible
+from .martini3bible import martini3bible, sugar_beadtype
 
 
 class Mapping:
@@ -56,6 +56,7 @@ class Mapping:
         for i, group_idx in enumerate(groups_idx):
             group = Bead(mol=self.mol, graph_heavy=self.graph_heavy, atom_idx=group_idx)
             groups.append(group)
+        # print([group.atom_idx for group in groups])
         assert sum([len(group) for group in groups]) == self.mol.GetNumHeavyAtoms(), \
             f'{sum([len(group) for group in groups])} = {self.mol.GetNumHeavyAtoms()}'
         self.groups = groups
@@ -98,21 +99,25 @@ class Mapping:
         self.update_connectivity()
         for i, group in enumerate(self.groups):
             for group_ in group.neighbors:
-                if len(group_) == 1 and len(group_.neighbors) == 1 and len(self.groups[i]) != 1:
+                if len(group_) == 1 and len(group_.neighbors) == 1 and len(self.groups[i]) != 1 and not group_.confirm:
                     self.groups[i] = self.groups[i].add_bead(group_)
                     group_.atom_idx.pop(0)
         self.groups = [group for group in self.groups if group.atom_idx]
         # step5, merge multi-connected single-heavy-atom groups into its neighbors
-        self.update_connectivity()
-        for i, group in enumerate(self.groups):
-            if len(group) == 1:
-                assert len(group.neighbors) != 1
-                merge_ranks = [group_.merge_rank() for group_ in group.neighbors]
-                merge_idx = merge_ranks.index(max(merge_ranks))
-                group_idx = self.groups.index(group.neighbors[merge_idx])
-                self.groups[group_idx] = self.groups[group_idx].add_bead(group)
-                group.atom_idx.pop(0)
-        self.groups = [group for group in self.groups if group.atom_idx]
+        while True:
+            self.update_connectivity()
+            for i, group in enumerate(self.groups):
+                if len(group) == 1 and not group.confirm:
+                    assert len(group.neighbors) != 1
+                    merge_ranks = [group_.merge_rank() for group_ in group.neighbors]
+                    merge_idx = merge_ranks.index(max(merge_ranks))
+                    group_idx = self.groups.index(group.neighbors[merge_idx])
+                    self.groups[group_idx] = self.groups[group_idx].add_bead(group)
+                    group.atom_idx.pop(0)
+                    self.groups = [group for group in self.groups if group.atom_idx]
+                    break
+            else:
+                break
         # step6, assign beads type based on Martini Bible.
         for group in self.groups:
             assert group.bead_type is not None
@@ -122,6 +127,8 @@ class Mapping:
                 group.bead_type = 'T' + group.bead_type
             elif len(group) == 3:
                 group.bead_type = 'S' + group.bead_type
+            if group.IsSugar:
+                group.bead_type = sugar_beadtype[group.bead_type]
         # step7,
         self.update_connectivity()
         for i, bead in enumerate(self.groups):
@@ -137,6 +144,22 @@ class Mapping:
                         self.constraints.append(bond)
                     else:
                         self.bonds.append(bond)
+
+        self.virtual_sites = []
+        for bond in self.constraints:
+            if bond.bead1.IsSugar and bond.bead2.IsSugar:
+                for vs in self.virtual_sites:
+                    if bond.bead1 in vs.beads or bond.bead2 in vs.beads:
+                        skip = True
+                        break
+                else:
+                    skip = False
+                if not skip:
+                    for neighbor in bond.bead1.neighbors:
+                        if neighbor.IsSugar and neighbor in bond.bead2.neighbors:
+                            self.virtual_sites.append(VirtualSite(beads=[bond.bead1, bond.bead2, neighbor]))
+        for i, bead in enumerate(self.virtual_sites):
+            bead.idx = len(self.groups) + i
 
         self.angles = []
         for bead in self.groups:
@@ -221,7 +244,7 @@ class Mapping:
     def generate_ndx_mapping(self, file: str):
         with open(file, 'w') as f:
             for i, group in enumerate(self.groups):
-                idx = [j+1 for j in group.atom_idx + group.atoms_idx_h]
+                idx = [j + 1 for j in group.atom_idx + group.atoms_idx_h]
                 f.write(f'[ B{i + 1} ]\n')
                 f.write(' '.join(list(map(str, idx))))
                 f.write('\n\n')
@@ -232,8 +255,12 @@ class Mapping:
             f.write(f'   {resName}         1\n')
             f.write('\n[ atoms ]\n')
             for i, bead in enumerate(self.groups):
-                f.write('%4d%5s   0%8s%5s%5s%5d%7d\n' % (i + 1, bead.bead_type, resName, 'B%d' % (i + 1), i + 1,
+                f.write('%7d%7s   0%8s%5s%5s%5d%7d\n' % (i + 1, bead.bead_type, resName, 'B%d' % (i + 1), i + 1,
                                                          bead.charge, bead.mass))
+                n_beads = i
+            for i, bead in enumerate(self.virtual_sites):
+                f.write('%7d%7s   0%8s%5s%5s%5d%7d\n' % (i + n_beads + 2, bead.bead_type, resName, 'VS%d' % (i + 1),
+                                                         i + n_beads + 2, bead.charge, bead.mass))
             if atom_only:
                 return
             f.write('\n[ constraints ]\n')
@@ -256,27 +283,43 @@ class Mapping:
                     f.write(';\n')
             f.write('\n[ dihedrals ]\n')
             for dihedral in self.dihedrals:
-                if dihedral.k1 != 0:
-                    f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
-                                                                     dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
-                                                                     dihedral.s1, dihedral.k1, 1))
-                if dihedral.k2 != 0:
-                    f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
-                                                                     dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
-                                                                     dihedral.s2, dihedral.k2, 2))
-                if dihedral.k3 != 0:
-                    f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
-                                                                     dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
-                                                                     dihedral.s3, dihedral.k3, 3))
+                if dihedral.func_type == 1:
+                    if dihedral.k1 != 0:
+                        f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                                                                         dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                                                                         dihedral.s1, dihedral.k1, 1))
+                    if dihedral.k2 != 0:
+                        f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                                                                         dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                                                                         dihedral.s2, dihedral.k2, 2))
+                    if dihedral.k3 != 0:
+                        f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                                                                         dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                                                                         dihedral.s3, dihedral.k3, 3))
+                else:
+                    assert dihedral.func_type == 2
+                    f.write('%7d%7d%7d%7d     2%10.3f%10.3f\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                                                                  dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                                                                  dihedral.d0, dihedral.kd))
                 if group:
                     f.write(';\n')
+            if self.virtual_sites:
+                f.write('\n[ virtual_sitesn ]\n')
+                for vs in self.virtual_sites:
+                    f.write('%7d%7d   ' % (vs.idx + 1, 1) + ' '.join([str(bead.idx + 1) for bead in vs.beads]) + '\n')
+                f.write('\n[ exclusions ]\n')
+                for vs in self.virtual_sites:
+                    f.write('%7d   ' % (vs.idx + 1) + ' '.join([str(bead.idx + 1) for bead in vs.beads]) + '\n')
 
     def generate_gro(self, file: str, resName: str, box_length: float):
         with open(file, 'w') as f:
             f.write('frame t= 0.000\n')
-            f.write('%5d\n' % len(self.groups))
+            f.write('%5d\n' % (len(self.groups) + len(self.virtual_sites)))
             for i, g in enumerate(self.groups):
-                f.write('    1%s%7s%5d%8.3f%8.3f%8.3f\n' % (resName, 'B%d' % (i + 1), i+1,
+                f.write('    1%s%7s%5d%8.3f%8.3f%8.3f\n' % (resName, 'B%d' % (i + 1), i + 1,
+                                                            g.com[-1][0], g.com[-1][1], g.com[-1][2]))
+            for i, g in enumerate(self.virtual_sites):
+                f.write('    1%s%7s%5d%8.3f%8.3f%8.3f\n' % (resName, 'VS%d' % (i + 1), i + 1 + len(self.groups),
                                                             g.com[-1][0], g.com[-1][1], g.com[-1][2]))
             f.write('%10.5f%10.5f%10.5f\n' % (box_length, box_length, box_length))
 
@@ -302,6 +345,8 @@ class Mapping:
             mda_atoms = U.select_atoms('index {}'.format(' '.join(map(str, atom_indices))))
             group.com = np.array([mda_atoms.center_of_mass() for ts in U.trajectory]) / 10  # unit in nm
             group.time = [ts.time for ts in U.trajectory]
+            # group.com = np.array([mda_atoms.center_of_mass() for j, ts in enumerate(U.trajectory) if j < 1000]) / 10  # unit in nm
+            # group.time = [ts.time for j, ts in enumerate(U.trajectory) if j < 1000]
 
     def load_cg_traj(self, gro: str, tpr: str):
         U = mda.Universe(tpr, gro)
@@ -310,30 +355,36 @@ class Mapping:
             group.position = np.array([U.atoms[i].position for ts in U.trajectory]) / 10  # unit in nm
             group.time = [ts.time for ts in U.trajectory]
 
-    def get_aa_distribution(self, tag: str = ''):
+    def get_aa_distribution(self, tag: str = '', dihedral_n1_180=[]):
         for i, bond in enumerate(self.bonds + self.constraints):
             bond.get_aa_distribution(tag=tag, fitting='mean_variance')
         for i, angle in enumerate(self.angles):
             angle.get_aa_distribution(tag=tag, fitting='mean_variance')
         for i, dihedral in enumerate(self.dihedrals):
-            dihedral.get_aa_distribution(tag=tag, fitting='least_square')
+            if i + 1 in dihedral_n1_180:
+                dihedral.fix_s1 = 0.
+            dihedral.get_aa_distribution(tag=tag)
 
     def update_parameter(self):
         for i, bond in enumerate(self.bonds + self.constraints):
+            #print(f'Update parameters for bond {bond.idx + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
             bond.update_cg_distribution(learning_rate=0.05)
         for i, angle in enumerate(self.angles):
+            #print(f'Update parameters for angle {angle.idx + 1}: {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
             angle.update_cg_distribution(learning_rate=0.05)
         for i, dihedral in enumerate(self.dihedrals):
+            #print(f'Update parameters for dihedral {dihedral.idx + 1}: {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
+            #      f'{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1}')
             dihedral.update_cg_distribution(learning_rate=0.05)
 
-    def write_distribution(self, file: str ='distribution.svg', CG: bool = True, fit: bool = False):
+    def write_distribution(self, file: str = 'distribution.svg', CG: bool = True, fit: bool = False):
         nx = 4
         ny = max(len(self.constraints), len(self.bonds), len(self.angles), len(self.dihedrals))
-        fig, axs = plt.subplots(nx, ny, figsize=(ny*4, nx*4))
+        fig, axs = plt.subplots(nx, ny, figsize=(ny * 4, nx * 4))
         d = 0.05
-        plt.subplots_adjust(left=d, right=1-d, top=1-d, bottom=d)
+        plt.subplots_adjust(left=d, right=1 - d, top=1 - d, bottom=d)
         for i, bond in enumerate(self.constraints):
-            axs[0, i].set_title(f'constraint {i+1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
+            axs[0, i].set_title(f'constraint {i + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
             axs[0, i].plot(bond.df_dist['bond_length'], bond.df_dist['p_aa'], color='red', label='AA')
             axs[0, i].fill_between(bond.df_dist['bond_length'], bond.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -347,7 +398,7 @@ class Mapping:
                 axs[0, i].fill_between(bond.df_dist['bond_length'], bond.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, bond in enumerate(self.bonds):
-            axs[1, i].set_title(f'bond {i+1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
+            axs[1, i].set_title(f'bond {i + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
             axs[1, i].plot(bond.df_dist['bond_length'], bond.df_dist['p_aa'], color='red', label='AA')
             axs[1, i].fill_between(bond.df_dist['bond_length'], bond.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -375,8 +426,9 @@ class Mapping:
                 axs[2, i].fill_between(angle.df_dist['angle'], angle.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, dihedral in enumerate(self.dihedrals):
-            axs[3, i].set_title(f'dihedral {i + 1}: {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
-                                f'{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1}')
+            axs[3, i].set_title(
+                f'dihedral {i + 1}(funct={dihedral.func_type}): {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
+                f'{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1}')
             axs[3, i].plot(dihedral.df_dist['dihedral'], dihedral.df_dist['p_aa'], color='red', label='AA')
             axs[3, i].fill_between(dihedral.df_dist['dihedral'], dihedral.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -392,13 +444,33 @@ class Mapping:
         plt.savefig(file, format=file.split('.')[1])
 
     def generate_mapping_img(self):
+        from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
         mol = Chem.RemoveHs(self.mol)
         mol.RemoveAllConformers()
+        highlightAtoms = []
+        highlightBonds = []
+        for bead in self.groups:
+            for i, atom in enumerate(bead.atoms):
+                idx = atom.GetIdx()
+                highlightAtoms.append(idx)
+                if i == 0:
+                    mol.GetAtomWithIdx(idx).SetProp('atomNote', f'{bead.bead_type}')
+            for bond in bead.bonds:
+                highlightBonds.append(bond.GetIdx())
+        opts = Draw.DrawingOptions()
+        opts.bgColor = None
+        d = rdMolDraw2D.MolDraw2DSVG(500, 500)
+        rdMolDraw2D.PrepareAndDrawMolecule(d, mol, highlightAtoms=highlightAtoms, highlightBonds=highlightBonds)
+        d.FinishDrawing()
+        with open('mapping.svg', 'w') as f:
+            # write the SVG text to the file
+            f.write(d.GetDrawingText())
+
         for bead in self.groups:
             for atom in bead.atoms:
                 idx = atom.GetIdx()
                 mol.GetAtomWithIdx(idx).SetProp('atomNote', f'B{bead.idx + 1}:{atom.GetIdx() + 1}')
-        Draw.MolToFile(mol, 'mapping.svg', size=(500, 500), imageType='svg')
+        Draw.MolToFile(mol, 'mapping_detail.svg', size=(500, 500), imageType='svg')
 
     def save(self, path='.', filename='mapping.pkl', overwrite=True):
         f_al = os.path.join(path, filename)

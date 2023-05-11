@@ -12,6 +12,45 @@ from itertools import permutations
 from ..utils import mol_to_nx, merge_lists
 
 
+class VirtualSite:
+    def __init__(self, beads=None):
+        self.beads = beads or []
+        self.bead_type = 'TC4'
+        self.mass = 0
+        self.charge = 0
+
+    def merge(self, beads):
+        overlap = False
+        for bead in beads:
+            if bead in self.beads:
+                overlap = True
+                break
+        if overlap:
+            for bead in beads:
+                if bead not in self.beads:
+                    self.beads.append(bead)
+        return overlap
+
+    @property
+    def com(self):
+        com = 0.
+        mass = 0.
+        for bead in self.beads:
+            com += bead.com * bead.mass
+            mass += bead.mass
+        return com / mass
+    @property
+    def idx(self) -> int:
+        try:
+            return self._idx
+        except AttributeError:
+            raise AttributeError('Please set idx first.')
+
+    @idx.setter
+    def idx(self, idx):
+        self._idx = idx
+
+
 class Bead:
     def __init__(self, mol: Chem.Mol,
                  graph_heavy: nx.Graph,
@@ -54,23 +93,30 @@ class Bead:
 
     def add_bead(self, group):
         merge_bead_type = {
-            'C3,P1': 'P1',
-            'C3,N5a': 'N5a',
             'P1,P1': 'P4r',
+            'N4a,N4a': 'N4a',  # double ether OCCO
             'C5,X3': 'X3',
-            'C5,N3a': 'N2a',
+            'C5,N4a': 'N2a',  # ether is N4a, benzene-ether is N2a
+            'C5,N5a': 'N4a',  # ketone is N5a, benzaldehyde is N4a
+            'C5,C3': 'C4',  #
+            'C5,P1': 'N6',  # Phenol
+            'C5,C6': 'C6',  # Thiophenol
+            'C5,X4e': 'X4e',  # fluorobenzene
+            'C5,X2': 'X2',  # bromobenzene
+            'C5,X1': 'X1',  # Iodobenzene
         }
         merge_idx = self.atom_idx + group.atom_idx
-        # print(1, self.bead_type)
-        # print(self.atom_idx)
-        # print(2, group.bead_type)
-        # print(group.atom_idx)
-        if group.bead_type == 'C1':
+        print(1, self.bead_type)
+        print(self.atom_idx)
+        print(2, group.bead_type)
+        print(group.atom_idx, group.confirm)
+        if group.bead_type in ['C1', 'C3']:
             bead_type = self.bead_type
+        elif self.bead_type in ['C1', 'C3']:
+            bead_type = group.bead_type
         else:
             bead_type = merge_bead_type.get(f'{self.bead_type},{group.bead_type}')
         assert bead_type is not None
-        # print(bead_type)
         g = Bead(mol=self.mol,
                  graph_heavy=self.graph_heavy,
                  atom_idx=merge_idx)
@@ -98,13 +144,14 @@ class Bead:
                 g = Bead(mol=self.mol,
                          graph_heavy=self.graph_heavy,
                          atom_idx=pair_idx)
-                g.bead_type = self.get_bead_type_of_pair_atoms(pair_idx)
+                g.bead_type = self.get_bead_type_of_pair_ring_atoms(pair_idx, bridgehead=True)
                 g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, pair_idx)
                 groups.append(g)
-            # create operation for non-bridgehead atoms in ring.
+            # create operation order for non-bridgehead atoms in ring.
             split_order = []
             for i, ring_idx in enumerate(self.raw_rings_idx):
                 ring_idx_without_bridgehead_atoms = self.ring_idx_without_bridgehead_atoms[i]
+                # ring contains bridgehead atoms
                 if len(ring_idx_without_bridgehead_atoms) < len(ring_idx):
                     if len(ring_idx_without_bridgehead_atoms) == 2:
                         split_order.append(1)
@@ -112,9 +159,12 @@ class Bead:
                         split_order.append(2)
                     else:
                         split_order.append(10)
+                # ring do not contain bridgehead atoms
                 else:
                     if len(ring_idx) == 6:
                         split_order.append(3)
+                    elif len(ring_idx) == 5:
+                        split_order.append(4)
                     else:
                         raise ValueError
                 if len(ring_idx) > 6:
@@ -132,7 +182,7 @@ class Bead:
                         g = Bead(mol=self.mol,
                                  graph_heavy=self.graph_heavy,
                                  atom_idx=ring_idx_wba)
-                        g.bead_type = self.get_bead_type_of_pair_atoms(ring_idx_wba)
+                        g.bead_type = self.get_bead_type_of_pair_ring_atoms(ring_idx_wba)
                         g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, ring_idx_wba)
                         groups.append(g)
                     # if the two atoms are not bonded, create two groups.
@@ -141,7 +191,7 @@ class Bead:
                             g = Bead(mol=self.mol,
                                      graph_heavy=self.graph_heavy,
                                      atom_idx=[ring_idx_wba[j]])
-                            g.bead_type = self.get_bead_type_of_pair_atoms([ring_idx_wba[j]])
+                            g.bead_type = self.get_bead_type_of_pair_ring_atoms([ring_idx_wba[j]])
                             g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, [ring_idx_wba[j]])
                             groups.append(g)
                 # four atoms are non-bridged in a 6-member ring
@@ -152,7 +202,7 @@ class Bead:
                         g = Bead(mol=self.mol,
                                  graph_heavy=self.graph_heavy,
                                  atom_idx=ring_idx_wba[j * 2:(j + 1) * 2])
-                        g.bead_type = self.get_bead_type_of_pair_atoms(ring_idx_wba[j * 2:(j + 1) * 2])
+                        g.bead_type = self.get_bead_type_of_pair_ring_atoms(ring_idx_wba[j * 2:(j + 1) * 2])
                         g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, ring_idx_wba[j * 2:(j + 1) * 2])
                         groups.append(g)
                 # six atoms are non-bridged in a 6-member ring
@@ -176,10 +226,35 @@ class Bead:
                     for j in range(int(len(ring_idx) / 2)):
                         g = Bead(mol=self.mol,
                                  graph_heavy=self.graph_heavy,
-                                 atom_idx=ring_idx_wba[j * 2:(j + 1) * 2])
-                        g.bead_type = self.get_bead_type_of_pair_atoms(ring_idx_wba[j * 2:(j + 1) * 2])
-                        g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, ring_idx_wba[j * 2:(j + 1) * 2])
+                                 atom_idx=ring_idx[j * 2:(j + 1) * 2])
+                        g.bead_type = self.get_bead_type_of_pair_ring_atoms(ring_idx[j * 2:(j + 1) * 2])
+                        g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, ring_idx[j * 2:(j + 1) * 2])
                         groups.append(g)
+                # 5 atoms are non-bridged in a 5-member ring
+                elif so == 4:
+                    assert len(ring_idx) == len(ring_idx_wba)
+                    atomic_numbers = [self.mol.GetAtomWithIdx(idx).GetAtomicNum() for idx in ring_idx]
+                    group_idx = []
+                    if atomic_numbers.count(6) == 4:
+                        _ = set(atomic_numbers)
+                        _.remove(6)
+                        non_carbon_atomic_number = list(_)[0]
+                        non_carbon_idx = atomic_numbers.index(non_carbon_atomic_number)
+                        group_idx.append([ring_idx.pop(non_carbon_idx)])
+                        if non_carbon_idx % 2 == 1:
+                            j = ring_idx.pop(0)
+                            ring_idx.append(j)
+                        group_idx.append(ring_idx[0:2])
+                        group_idx.append(ring_idx[2:4])
+                        for idx in group_idx:
+                            g = Bead(mol=self.mol,
+                                     graph_heavy=self.graph_heavy,
+                                     atom_idx=idx)
+                            g.bead_type = self.get_bead_type_of_pair_ring_atoms(idx)
+                            g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, idx)
+                            groups.append(g)
+                    else:
+                        raise ValueError
             # create groups for non-used atoms
             used_atoms = []
             for group in groups:
@@ -192,14 +267,17 @@ class Bead:
                 group = Bead(mol=self.mol,
                              graph_heavy=self.graph_heavy,
                              atom_idx=group_idx)
-                group.bead_type = self.get_bead_type_of_pair_atoms(group_idx)
+                group.bead_type = self.get_bead_type_of_pair_ring_atoms(group_idx)
                 group.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, group_idx)
                 groups.append(group)
             return groups
         else:
             return [self]
 
-    def get_bead_type_of_pair_atoms(self, pair_idx):
+    def get_bead_type_of_pair_ring_atoms(self, pair_idx, bridgehead: bool = False):
+        for idx in pair_idx:
+            atom = self.mol.GetAtomWithIdx(idx)
+            assert atom.IsInRing()
         if len(pair_idx) == 1:
             atom = self.mol.GetAtomWithIdx(pair_idx[0])
             if atom.GetAtomicNum() == 6:
@@ -208,6 +286,17 @@ class Bead:
                         return 'C5'
                     else:
                         return 'C3'
+            elif atom.GetAtomicNum() == 7:
+                return 'N6d'  # pyrrolidine and pyrrole
+            elif atom.GetAtomicNum() == 8:
+                if set([a.GetIsAromatic() for a in atom.GetNeighbors()]) == {True}:
+                    return 'TN2a'  # furan
+                else:
+                    return 'N4a'  # tetrahydrofuran
+            elif atom.GetAtomicNum() == 16:
+                return 'C6'  # sulfur
+            else:
+                raise ValueError
         elif len(pair_idx) == 2:
             atom1 = self.mol.GetAtomWithIdx(pair_idx[0])
             atom2 = self.mol.GetAtomWithIdx(pair_idx[1])
@@ -215,7 +304,11 @@ class Bead:
             bond_order = int(bond.GetBondType())
             if sorted([atom1.GetAtomicNum(), atom2.GetAtomicNum()]) == [6, 6]:
                 if atom1.GetIsAromatic() and atom2.GetIsAromatic():
-                    return 'C5'  # aromatic ring
+                    if bridgehead and set([a.GetIsAromatic() for a in atom1.GetNeighbors()] +
+                                          [a.GetIsAromatic() for a in atom2.GetNeighbors()]) == {True}:
+                        return 'C5e'  # two bridged atoms of two aromatic ring
+                    else:
+                        return 'C5'  # aromatic ring
                 elif bond_order == 1:
                     return 'C3'  # cyclic alkane
                 elif bond_order == 2:
@@ -227,10 +320,12 @@ class Bead:
             elif sorted([atom1.GetAtomicNum(), atom2.GetAtomicNum()]) == [6, 8]:
                 assert bond_order == 1
                 assert not (atom1.GetIsAromatic() and atom2.GetIsAromatic())
-                return 'N3r'  # ether
+                return 'N4a'  # ether, N3a for C1COCCO1.
             elif sorted([atom1.GetAtomicNum(), atom2.GetAtomicNum()]) == [6, 7]:
                 if atom1.GetIsAromatic() and atom2.GetIsAromatic():
                     return 'N6a'  # pyridine
+                elif bond_order == 1:
+                    return 'N6d'
                 else:
                     raise ValueError
             else:
@@ -252,17 +347,31 @@ class Bead:
                         assert self.graph_heavy.has_edge(idx, ring_idx[0])
 
     def merge_rank(self):
-        if len(self) >= 4:
+        if self.bead_type.startswith('C'):
+            bead_rank = 19 - int(self.bead_type[1])
+        elif self.bead_type.startswith('N'):
+            bead_rank = 13 - int(self.bead_type[1])
+        elif self.bead_type.startswith('P'):
+            bead_rank = 7 - int(self.bead_type[1])
+        else:
+            raise ValueError
+        if len(self) == 4:
             return 0
         elif len(self) == 3:
             if self.IsPartInRing:
-                return 1
+                return bead_rank
             else:
-                return 2
+                return 18 + bead_rank
         elif len(self) == 2:
-            return 3
+            if self.IsPartInRing:
+                return 2 * 18 + bead_rank
+            else:
+                return 3 * 18 + bead_rank
         elif len(self) == 1:
-            return 4
+            if self.IsPartInRing:
+                return 4 * 18 + bead_rank
+            else:
+                return 5 * 18 + bead_rank
 
     def cal_symmetry(self, atom1: Chem.Atom, atom2: Chem.Atom, discarded_idx: List[int]):
         an1 = sorted([n.GetAtomicNum() for n in atom1.GetNeighbors() if n.GetIdx() not in discarded_idx])
@@ -307,6 +416,17 @@ class Bead:
         return [self.mol.GetAtomWithIdx(idx) for idx in self.atom_idx]
 
     @property
+    def bonds(self) -> List[Chem.Bond]:
+        bonds = []
+        for i, k in enumerate(self.atom_idx):
+            for j in range(i+1, len(self)):
+                l = self.atom_idx[j]
+                bond = self.mol.GetBondBetweenAtoms(k, l)
+                if bond is not None:
+                    bonds.append(bond)
+        return bonds
+
+    @property
     def atoms_idx_h(self):
         idx_h = []
         for atom in self.atoms:
@@ -314,6 +434,18 @@ class Bead:
                 if neighbor.GetAtomicNum() == 1:
                     idx_h.append(neighbor.GetIdx())
         return idx_h
+
+    @property
+    def IsSugar(self) -> bool:
+        sugar_smarts = '[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O'
+        matches = self.mol.GetSubstructMatches(Chem.MolFromSmarts(sugar_smarts))
+        for match in matches:
+            _ = set([i in match for i in self.atom_idx])
+            assert _ != {True, False}
+            if set(_) == {True}:
+                return True
+        else:
+            return False
 
     @property
     def IsAllInRing(self) -> bool:
@@ -420,3 +552,10 @@ class Bead:
     @property
     def charge(self):
         return sum([atom.GetFormalCharge() for atom in self.atoms])
+
+    @property
+    def confirm(self) -> bool:
+        if self.bead_type.startswith('T') or self.bead_type.startswith('S'):
+            return True
+        else:
+            return False

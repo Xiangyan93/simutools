@@ -34,14 +34,17 @@ class GROMACS:
         #     raise GmxError('Supported GROMACS versions: 2016.x, 2018.x, 2019.x')
         # self.majorversion = self.version.split('.')[0]
 
-    def generate_top(self, file: str, include_itps: List[str], resName: str):
+    @staticmethod
+    def generate_top(file: str, include_itps: List[str], mol_name: List[str], mol_number: List[int]):
         with open(file, 'w') as f:
             for include_itp in include_itps:
                 f.write(f'#include "{include_itp}"\n')
             f.write('\n[ system ]\n')
-            f.write('One molecule\n')
+            info = ', '.join([f'{name} {mol_number[i]}' for i, name in enumerate(mol_name)])
+            f.write(f'{info}\n')
             f.write('\n[ molecules ]\n')
-            f.write(f'{resName}         1\n')
+            for i, name in enumerate(mol_name):
+                f.write(f'{name}         {mol_number[i]}\n')
         return
 
     def generate_mdp_from_template(self, template: str, mdp_out: str = 'grompp.mdp', T: float = 298, P: float = 1,
