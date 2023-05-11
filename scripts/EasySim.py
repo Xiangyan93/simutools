@@ -47,6 +47,12 @@ class CommonArgs(Tap):
 
     def process_args(self) -> None:
         assert len(self.box_size) == 3
+        valid_index= []
+        for i, n in enumerate(self.n_mol_list):
+            if n != 0:
+                valid_index.append(i)
+        self.gro_list = [self.gro_list[i] for i in valid_index]
+        self.n_mol_list = [self.n_mol_list[i] for i in valid_index]
 
 
 def main(args: CommonArgs):
