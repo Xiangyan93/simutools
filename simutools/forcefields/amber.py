@@ -47,6 +47,12 @@ class AMBER:
             amber = pmd.load_file(f'{name}.prmtop', f'{name}.inpcrd')
             if tip3p:
                 amber += pmd.load_file(f'{TEMPLATE_DIR}/tip3p.top', xyz=f'{TEMPLATE_DIR}/tip3p.gro')
+            if charge > 0:
+                for i in range(int(charge)):
+                    amber += pmd.load_file(f'{TEMPLATE_DIR}/chloride.top', xyz=f'{TEMPLATE_DIR}/chloride.gro')
+            elif charge > 0:
+                for i in range(int(abs(charge))):
+                    amber += pmd.load_file(f'{TEMPLATE_DIR}/sodium.top', xyz=f'{TEMPLATE_DIR}/sodium.gro')
             amber.save(f'{name}.top')
             amber.strip(f':SOL')
             amber.save(f'{name}.gro')
