@@ -78,7 +78,7 @@ def main(args: CommonArgs):
                                               f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp'] + itp_list,
                      mol_name=res_name, mol_number=args.n_mol_list)
     gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
-    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=100000, dt=0.005,
+    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=200000, dt=0.002,
                                    tcoupl='v-rescale', tau_t='1.0',
                                    pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',
