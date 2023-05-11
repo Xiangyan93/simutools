@@ -36,13 +36,17 @@ class CommonArgs(Tap):
     n_mol_list: List[int]
     """number of molecules."""
     box_size: List[float]
-    """unit: nm."""
+    """X, Y, Z box size. unit: nm."""
     itp_list: List[str]
     """"""
     ntmpi: int = None
     """number of MPI threads for gmx"""
     ntomp: int = None
     """number of OpenMP threads for gmx"""
+    n_steps: int = 5000000
+
+    def process_args(self) -> None:
+        assert len(self.box_size) == 3
 
 
 def main(args: CommonArgs):
@@ -73,7 +77,7 @@ def main(args: CommonArgs):
                                    pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',
                                    rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005, nstxtcout=1000,
+    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
                                    restart=True,
                                    tcoupl='v-rescale', tau_t='1.0',
                                    pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
