@@ -19,8 +19,8 @@
      15   SP4r   0     GLY  B15   15    0     72
      16  TN4ar   0     GLY  B16   16    0     36
      17    SN6   0     GLY  B17   17    0     54
-     18   SQ5n   0     GLY  B18   18    0     54
-     19   SQ5n   0     GLY  B19   19    0     54
+     18   SQ5n   0     GLY  B18   18    -1.0  54
+     19   SQ5n   0     GLY  B19   19    -1.0  54
      20    SP2   0     GLY  B20   20    0     54
      21    TC4   0     GLY  VS1   21    0      0
      22    TC4   0     GLY  VS2   22    0      0
