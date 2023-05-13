@@ -22,7 +22,7 @@ class CommonArgs(Tap):
     """residual name"""
     smiles: str = None
     """SMILES of the molecule."""
-    action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg']
+    action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg', 'stability']
     """action to be conducted."""
     dihedral_n1_180: List[int] = []
     """dihedral index with periodicity of 360 degrees and balanced angle of 180 degrees"""
@@ -96,14 +96,14 @@ def main(args: CommonArgs):
                                                               f'CG_{args.name}.itp'],
                          mol_name=[args.res_name], mol_number=[1])
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=10000, dt=0.005,
-                                       tcoupl='v-rescale', tau_t='1.0',
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=100000, dt=0.005,
+                                       tcoupl='v-rescale', tau_t='0.1',
                                        pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff',
                                        rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=500000, dt=0.005, nstxtcout=10,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=1000000, dt=0.01, nstxtcout=20,
                                        restart=True,
-                                       tcoupl='v-rescale', tau_t='1.0',
+                                       tcoupl='v-rescale', tau_t='0.1',
                                        pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff', rcoulomb='1.1',
                                        rvdw='1.1', dielectric=15, nstlist=20)
@@ -127,12 +127,36 @@ def main(args: CommonArgs):
             gmx.trjconv(gro=f'CG_run_{i}.xtc', out_gro=f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr', pbc_whole=True)
 
             mapping.load_cg_traj(f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr')
-            mapping.write_distribution(file='distribution_CG.svg', CG=False, fit=False)
             mapping.update_parameter()
             mapping.write_distribution(CG=True)
             for bead in mapping.groups:
                 bead.position = None
             os.chdir('..')
+    elif args.action == 'stability':
+        cd_and_mkdir('4.stability')
+        gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=100000, dt=0.005,
+                                       tcoupl='v-rescale', tau_t='0.1',
+                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       constraints='none', coulombtype='cutoff',
+                                       rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=10000000, dt=0.01, nstxtcout=20,
+                                       restart=True,
+                                       tcoupl='v-rescale', tau_t='0.1',
+                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
+                                       constraints='none', coulombtype='cutoff', rcoulomb='1.1',
+                                       rvdw='1.1', dielectric=15, nstlist=20)
+        shutil.copy(f'../CG_{args.name}.itp', '.')
+        shutil.copy(f'../CG_{args.name}.top', '.')
+        shutil.copy(f'../CG_{args.name}.gro', '.')
+        gmx.grompp(gro=f'CG_{args.name}.gro', mdp='CG_em.mdp', top=f'CG_{args.name}.top', tpr=f'CG_em.tpr')
+        gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+        gmx.grompp(gro=f'CG_em.gro', mdp='CG_eq.mdp', top=f'CG_{args.name}.top', tpr=f'CG_eq.tpr',
+                   maxwarn=2)
+        gmx.mdrun(tpr=f'CG_eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+        gmx.grompp(gro=f'CG_eq.gro', mdp='CG_run.mdp', top=f'CG_{args.name}.top', tpr=f'CG_run.tpr',
+                   maxwarn=1)
+        gmx.mdrun(tpr=f'CG_run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
     elif args.action == 'swarm-cg':
         cd_and_mkdir('3.swarm-cg')
         mapping = Mapping.load(path='../2.cg-mapping')
@@ -151,6 +175,7 @@ def main(args: CommonArgs):
               f'-cg_map {args.name}.ndx -cg_itp CG_{args.name}.itp -cg_gro CG_initial.gro -cg_top CG_{args.name}.top ' \
               f'-cg_mdp_mini swarm_cg_mini.mdp -cg_mdp_equi swarm_cg_equi.mdp -cg_mdp_md swarm_cg_md.mdp -gmx gmx'
         execute(cmd)
+
     if args.action == 'cg-sim':
         gmx.generate_top(f'CG_{args.name}.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
                                                               f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',

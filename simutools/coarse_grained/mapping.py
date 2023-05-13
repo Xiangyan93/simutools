@@ -180,6 +180,7 @@ class Mapping:
                         continue
                     dihedral = Dihedral(b1, b2, b3, b4, idx=len(self.dihedrals))
                     if dihedral not in self.dihedrals:
+                        dihedral.set_angles(self.angles)
                         self.dihedrals.append(dihedral)
         """
         self.cg_graph = nx.Graph()
@@ -277,8 +278,8 @@ class Mapping:
                     f.write(';\n')
             f.write('\n[ angles ]\n')
             for angle in self.angles:
-                f.write('%7d%7d%7d     1%10.3f%10.3f\n' % (angle.bead1.idx + 1, angle.bead2.idx + 1,
-                                                           angle.bead3.idx + 1, angle.a0, angle.ka))
+                f.write('%7d%7d%7d%7d%10.3f%10.3f\n' % (angle.bead1.idx + 1, angle.bead2.idx + 1,
+                                                        angle.bead3.idx + 1, angle.func_type, angle.a0, angle.ka))
                 if group:
                     f.write(';\n')
             f.write('\n[ dihedrals ]\n')
@@ -296,11 +297,27 @@ class Mapping:
                         f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
                                                                          dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
                                                                          dihedral.s3, dihedral.k3, 3))
-                else:
-                    assert dihedral.func_type == 2
+                elif dihedral.func_type == 2:
                     f.write('%7d%7d%7d%7d     2%10.3f%10.3f\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
                                                                   dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
                                                                   dihedral.d0, dihedral.kd))
+                elif dihedral.func_type == 3:
+                    f.write('%7d%7d%7d%7d     3%10.3f%10.3f%10.3f%10.3f%10.3f%10.3f\n' % (
+                        dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                        dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                        dihedral.C0, dihedral.C1,
+                        dihedral.C2, dihedral.C3,
+                        dihedral.C4, dihedral.C5))
+                else:
+                    assert dihedral.func_type == 11
+                    sin_angles = np.sin(dihedral.angles[0].a0_rad_aa) ** 3 * np.sin(dihedral.angles[1].a0_rad_aa) ** 3
+                    k = 10.0
+                    f.write('%7d%7d%7d%7d    11%10.3f%10.3f%10.3f%10.3f%10.3f%10.3f\n' % (
+                        dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
+                        dihedral.bead3.idx + 1, dihedral.bead4.idx + 1,
+                        dihedral.a0 / k / sin_angles, dihedral.a1 / k / sin_angles,
+                        dihedral.a2 / k / sin_angles, dihedral.a3 / k / sin_angles,
+                        dihedral.a4 / k / sin_angles, k))
                 if group:
                     f.write(';\n')
             if self.virtual_sites:
@@ -367,13 +384,13 @@ class Mapping:
 
     def update_parameter(self):
         for i, bond in enumerate(self.bonds + self.constraints):
-            #print(f'Update parameters for bond {bond.idx + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
+            # print(f'Update parameters for bond {bond.idx + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
             bond.update_cg_distribution(learning_rate=0.05)
         for i, angle in enumerate(self.angles):
-            #print(f'Update parameters for angle {angle.idx + 1}: {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
+            # print(f'Update parameters for angle {angle.idx + 1}: {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
             angle.update_cg_distribution(learning_rate=0.05)
         for i, dihedral in enumerate(self.dihedrals):
-            #print(f'Update parameters for dihedral {dihedral.idx + 1}: {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
+            # print(f'Update parameters for dihedral {dihedral.idx + 1}: {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
             #      f'{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1}')
             dihedral.update_cg_distribution(learning_rate=0.05)
 
@@ -412,7 +429,8 @@ class Mapping:
                 axs[1, i].fill_between(bond.df_dist['bond_length'], bond.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, angle in enumerate(self.angles):
-            axs[2, i].set_title(f'angle {i + 1}: {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
+            axs[2, i].set_title(
+                f'angle {i + 1}(funct={angle.func_type}): {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
             axs[2, i].plot(angle.df_dist['angle'], angle.df_dist['p_aa'], color='red', label='AA')
             axs[2, i].fill_between(angle.df_dist['angle'], angle.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:

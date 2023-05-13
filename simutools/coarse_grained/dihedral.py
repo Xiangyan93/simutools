@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import warnings
 from .bead import Bead
+from .angle import Angle
 from ..utils import curve_fit_rsq
 
 
@@ -41,6 +42,7 @@ class Dihedral:
         self.df_dist = pd.DataFrame({'dihedral': np.degrees(bin_edges), 'p_aa': hist})
         if np.count_nonzero(hist < 1e-6) > nbins * 5 / 6:
             self.func_type = 2  # improper dihedral harmonic.
+            # assert not self.CBT
             idx = np.where(hist > 1e-6)[0]
             if 0 in idx.tolist() and nbins - 1 in idx.tolist():
                 idx0 = idx[idx < nbins / 2]
@@ -49,46 +51,62 @@ class Dihedral:
                 assert idx1.min() == nbins - len(idx1)
             else:
                 assert idx.max() - idx.min() + 1 == len(idx)
+        # elif self.CBT:
+        #     self.func_type = 11
         else:
-            self.func_type = 1  # proper dihedral
-        if self.func_type == 1:
+            self.func_type = 13  # proper dihedral
+        if self.func_type == 13:
             self.beta = 1000 / 8.314 / T
-            self.k1_aa, self.s1_aa, self.k2_aa, self.s2_aa, self.k3_aa, self.s3_aa, best_func, best_popt, score, \
-            self.f_idx = self.fit(bin_edges, hist, f_idx=f_idx)
+            a, b, c, d, e, f, best_func, best_popt, score, self.f_idx = self.fit1and3(bin_edges, hist)
+            if self.func_type == 1:
+                self.k1_aa, self.s1_aa, self.k2_aa, self.s2_aa, self.k3_aa, self.s3_aa = a, b, c, d, e, f
+                self.k1, self.s1, self.k2, self.s2, self.k3, self.s3 = a, b, c, d, e, f
+            else:
+                assert self.func_type == 3
+                self.C0_aa, self.C1_aa, self.C2_aa, self.C3_aa, self.C4_aa, self.C5_aa = 0, b, c, d, e, f
+                self.C0, self.C1, self.C2, self.C3, self.C4, self.C5 = 0, b, c, d, e, f
             if score < 0.8:
                 warnings.warn(f'Dihedral {self.idx + 1}: Bead{self.bead1.idx + 1}-Bead{self.bead2.idx + 1}-'
                               f'Bead{self.bead3.idx + 1}-Bead{self.bead4.idx + 1} fit not good.')
             self.df_dist['p_fit'] = best_func(bin_edges, *best_popt)
-            self.k1, self.s1, self.k2, self.s2, self.k3, self.s3 = \
-                self.k1_aa, self.s1_aa, self.k2_aa, self.s2_aa, self.k3_aa, self.s3_aa
         elif self.func_type == 2:
             self.beta = 1000 / 8.314 / T
             d_rad = self._pbc(dihedrals_rad_traj, dihedrals_rad_traj[0] - np.pi, dihedrals_rad_traj[0] + np.pi)
             self.d0_rad_aa = self._pbc(d_rad.mean(), 0, 2 * np.pi)
             self.d0_degree_aa = np.degrees(self.d0_rad_aa)
             self.kd_aa = 1 / (2 * self.beta * d_rad.var())
-            self.df_dist['p_fit'] = self.func_harmonic(bin_edges, self.d0_rad_aa, self.kd_aa)
+            self.df_dist['p_fit'] = self.func2(bin_edges, self.d0_rad_aa, self.kd_aa)
             self.d0, self.kd = self.d0_degree_aa, self.kd_aa
+        elif self.func_type == 11:
+            self.beta = 1000 / 8.314 / T
+            _, self.a1_aa, self.a2_aa, self.a3_aa, self.a4_aa, best_func, best_popt, score, self.f_idx = \
+                self.fit11(bin_edges, hist, f_idx=f_idx)
+            if score < 0.8:
+                warnings.warn(f'Dihedral {self.idx + 1}: Bead{self.bead1.idx + 1}-Bead{self.bead2.idx + 1}-'
+                              f'Bead{self.bead3.idx + 1}-Bead{self.bead4.idx + 1} fit not good.')
+            self.df_dist['p_fit'] = best_func(bin_edges, *best_popt)
+            self.a1, self.a2, self.a3, self.a4 = self.a1_aa, self.a2_aa, self.a3_aa, self.a4_aa
+            self.a0 = 11.5 - self.a1 - self.a2 - self.a3 - self.a4
         else:
             raise ValueError
         self.df_dist.to_csv(f'dist_dihedral_{self.idx + 1}{tag}.xvg', header=False, index=False, sep='\t')
 
-    def fit(self, x, y, f_idx: int = None):
+    def fit1(self, x, y, f_idx: int = None):
         if self.fix_s1 is not None:
-            best_func = lambda x, c, k1: self.func(x, c, k1, self.fix_s1, 0, 0, 0, 0)
+            best_func = lambda x, c, k1: self.func1(x, c, k1, self.fix_s1, 0, 0, 0, 0)
             best_popt, best_score = curve_fit_rsq(f=best_func, xdata=x, ydata=y,
                                                   bounds=[[-np.inf, 0], [np.inf, np.inf]])
             k1, s1, k2, s2, k3, s3 = best_popt[1], self.fix_s1, 0, 0, 0, 0
             best_i = -1
         else:
             funcs = [
-                lambda x, c, k1, s1: self.func(x, c, k1, s1, 0, 0, 0, 0),
-                lambda x, c, k2, s2: self.func(x, c, 0, 0, k2, s2, 0, 0),
-                lambda x, c, k3, s3: self.func(x, c, 0, 0, 0, 0, k3, s3),
-                lambda x, c, k1, s1, k2, s2: self.func(x, c, k1, s1, k2, s2, 0, 0),
-                lambda x, c, k2, s2, k3, s3: self.func(x, c, 0, 0, k2, s2, k3, s3),
-                lambda x, c, k1, s1, k3, s3: self.func(x, c, k1, s1, 0, 0, k3, s3),
-                lambda x, c, k1, s1, k2, s2, k3, s3: self.func(x, c, k1, s1, k2, s2, k3, s3),
+                lambda x, c, k1, s1: self.func1(x, c, k1, s1, 0, 0, 0, 0),
+                lambda x, c, k2, s2: self.func1(x, c, 0, 0, k2, s2, 0, 0),
+                lambda x, c, k3, s3: self.func1(x, c, 0, 0, 0, 0, k3, s3),
+                lambda x, c, k1, s1, k2, s2: self.func1(x, c, k1, s1, k2, s2, 0, 0),
+                lambda x, c, k2, s2, k3, s3: self.func1(x, c, 0, 0, k2, s2, k3, s3),
+                lambda x, c, k1, s1, k3, s3: self.func1(x, c, k1, s1, 0, 0, k3, s3),
+                lambda x, c, k1, s1, k2, s2, k3, s3: self.func1(x, c, k1, s1, k2, s2, k3, s3),
             ]
             best_score = 0.
             for i, func in enumerate(funcs):
@@ -100,8 +118,11 @@ class Dihedral:
                     n = 2
                 else:
                     n = 3
-                popt, score = curve_fit_rsq(f=func, xdata=x, ydata=y,
-                                            bounds=[[-np.inf] + [0, -np.inf] * n, [np.inf] * (1 + n * 2)])
+                try:
+                    popt, score = curve_fit_rsq(f=func, xdata=x, ydata=y,
+                                                bounds=[[-np.inf] + [0, -np.inf] * n, [np.inf] * (1 + n * 2)])
+                except:
+                    continue
                 if f_idx is not None or score > 0.95:
                     best_func = func
                     best_popt = popt
@@ -132,15 +153,76 @@ class Dihedral:
         return k1, self._pbc(np.degrees(s1), 0, 360), k2, self._pbc(np.degrees(s2), 0, 360), \
                k3, self._pbc(np.degrees(s3), 0, 360), best_func, best_popt, best_score, best_i
 
+    def fit3(self, x, y, f_idx: int = None):
+        funcs = [
+            lambda x, C0, C1: self.func3(x, C0, C1, 0, 0, 0, 0),
+            lambda x, C0, C1, C2: self.func3(x, C0, C1, C2, 0, 0, 0),
+            lambda x, C0, C1, C2, C3: self.func3(x, C0, C1, C2, C3, 0, 0),
+            lambda x, C0, C1, C2, C3, C4: self.func3(x, C0, C1, C2, C3, C4, 0),
+            self.func3
+        ]
+        best_score = 0.
+        for i, func in enumerate(funcs):
+            if f_idx is not None and i != f_idx:
+                continue
+            try:
+                popt, score = curve_fit_rsq(f=func, xdata=x, ydata=y)
+            except:
+                continue
+            if f_idx is not None or score > 0.95:
+                best_func = func
+                best_popt = popt
+                best_score = score
+                best_i = i
+                break
+            elif score > best_score:
+                best_func = func
+                best_popt = popt
+                best_score = score
+                best_i = i
+        C0, C1, C2, C3, C4, C5 = *best_popt, *([0] * (6 - len(best_popt)))
+        return C0, C1, C2, C3, C4, C5, best_func, best_popt, best_score, best_i
+
+    def fit1and3(self, x, y):
+        k1, s1, k2, s2, k3, s3, best_func1, best_popt1, best_score1, best_i1 = self.fit1(x, y)
+        C0, C1, C2, C3, C4, C5, best_func3, best_popt3, best_score3, best_i3 = self.fit3(x, y)
+        if best_score1 > best_score3:
+            self.func_type = 1
+            return k1, s1, k2, s2, k3, s3, best_func1, best_popt1, best_score1, best_i1
+        else:
+            self.func_type = 3
+            return C0, C1, C2, C3, C4, C5, best_func3, best_popt3, best_score3, best_i3
+
+    def fit11(self, x, y, f_idx: int = None):
+        funcs = [
+            lambda x, a0, a1: self.func11(x, a0, a1, 0, 0, 0),
+            lambda x, a0, a1, a2: self.func11(x, a0, a1, a2, 0, 0),
+            lambda x, a0, a1, a2, a3: self.func11(x, a0, a1, a2, a3, 0),
+            self.func11
+        ]
+        best_score = 0.
+        for i, func in enumerate(funcs):
+            if f_idx is not None and i != f_idx:
+                continue
+            popt, score = curve_fit_rsq(f=func, xdata=x, ydata=y)
+            if f_idx is not None or score > 0.95:
+                best_func = func
+                best_popt = popt
+                best_score = score
+                best_i = i
+                break
+            elif score > best_score:
+                best_func = func
+                best_popt = popt
+                best_score = score
+                best_i = i
+        a0, a1, a2, a3, a4 = *best_popt, *([0] * (5 - len(best_popt)))
+        return a0, a1, a2, a3, a4, best_func, best_popt, best_score, best_i
+
     @staticmethod
     def _pbc(v, p_min, p_max):
         assert p_max > p_min
         periodic = p_max - p_min
-        #if v >= p_max:
-        #    v -= periodic * int((v - p_max) / periodic + 1)
-        #elif v < p_min:
-        #    v += periodic * int((p_min - v) / periodic + 1)
-        #return v
         v = np.where(v < p_min, np.fmod(v, periodic) + periodic, v)
         v = np.where(v >= p_max, np.fmod(v, periodic) - periodic, v)
         return v
@@ -154,7 +236,7 @@ class Dihedral:
         if self.func_type == 1:
             if not (self.k1 == 0 and self.k2 == 0 and self.k3 == 0):
                 try:
-                    k1, s1, k2, s2, k3, s3, best_func, best_popt, score, _ = self.fit(bin_edges, hist, f_idx=self.f_idx)
+                    k1, s1, k2, s2, k3, s3, best_func, best_popt, score, _ = self.fit1(bin_edges, hist, f_idx=self.f_idx)
                     self.k1 += (self.k1_aa - k1) * learning_rate
                     self.s1 += self._pbc(self.s1_aa - s1, -180., 180.) * learning_rate
                     self.k2 += (self.k2_aa - k2) * learning_rate
@@ -163,8 +245,7 @@ class Dihedral:
                     self.s3 += self._pbc(self.s3_aa - s3, -180., 180.) * learning_rate
                 except:
                     warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
-        else:
-            assert self.func_type == 2
+        elif self.func_type == 2:
             dihedrals_rad_traj_cg = self._pbc(dihedrals_rad_traj_cg,
                                               dihedrals_rad_traj_cg[0] - np.pi,
                                               dihedrals_rad_traj_cg[0] + np.pi)
@@ -177,14 +258,45 @@ class Dihedral:
             mul_kd = self.kd_aa / kd_cg
             self.kd += self.kd * (mul_kd - 1) * learning_rate
             # self.kd = np.clip(self.kd, self.kd_aa / limit, self.kd_aa * limit)
+        elif self.func_type == 3:
+            try:
+                C0, C1, C2, C3, C4, C5, best_func, best_popt, score, _ = self.fit3(bin_edges, hist, f_idx=self.f_idx)
+                self.C1 += (self.C1_aa - C1) * learning_rate
+                self.C2 += (self.C2_aa - C2) * learning_rate
+                self.C3 += (self.C3_aa - C3) * learning_rate
+                self.C4 += (self.C4_aa - C4) * learning_rate
+                self.C5 += (self.C5_aa - C5) * learning_rate
+            except:
+                warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
+        else:
+            assert self.func_type == 11
+            try:
+                _, a1, a2, a3, a4, best_func, best_popt, score, _ = self.fit11(bin_edges, hist, f_idx=self.f_idx)
+                self.a1 += (self.a1_aa - a1) * learning_rate
+                self.a2 += (self.a2_aa - a2) * learning_rate
+                self.a3 += (self.a3_aa - a3) * learning_rate
+                self.a4 += (self.a4_aa - a4) * learning_rate
+                self.a0 = 11.5 - self.a1 - self.a2 - self.a3 - self.a4
+            except:
+                warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
 
-    def func(self, x, c, k1, s1, k2, s2, k3, s3):
+    def func1(self, x, c, k1, s1, k2, s2, k3, s3):
         V = k1 * (1 + np.cos(x - s1)) + k2 * (1 + np.cos(x * 2 - s2)) + k3 * (1 + np.cos(x * 3 - s3)) + c
         return np.exp(- V * self.beta)
 
-    def func_harmonic(self, x, d0, k):
+    def func2(self, x, d0, k):
         V = k * (x - d0) ** 2
         return np.exp(- V * self.beta) / np.sqrt(np.pi / self.beta / k)
+
+    def func3(self, x, C0, C1, C2, C3, C4, C5):
+        cosx = np.cos(x - np.pi)
+        V = C0 + C1 * cosx + C2 * cosx ** 2 + C3 * cosx ** 3 + C4 * cosx ** 4 + C5 * cosx ** 5
+        return np.exp(- V * self.beta)
+
+    def func11(self, x, a0, a1, a2, a3, a4):
+        cosx = np.cos(x)
+        V = a0 + a1 * cosx + a2 * cosx ** 2 + a3 * cosx ** 3 + a4 * cosx ** 4
+        return np.exp(- V * self.beta)
 
     @staticmethod
     def calculate_dihedral(A, B, C, D):
@@ -203,3 +315,18 @@ class Dihedral:
                                                                                                0) + np.where(
             angle_ref > 0, 2 * np.pi, 0)
         return dihedral_rad
+
+    def set_angles(self, angles: List[Angle]):
+        self.angles = []
+        for angle in angles:
+            if set(angle.bead_idx) in [{self.bead1.idx, self.bead2.idx, self.bead3.idx},
+                                       {self.bead2.idx, self.bead3.idx, self.bead4.idx}]:
+                self.angles.append(angle)
+        # assert len(self.angles) == 2
+
+    @property
+    def CBT(self):
+        for angle in self.angles:
+            if angle.CBT:
+                return True
+        return False

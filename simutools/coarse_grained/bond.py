@@ -48,19 +48,21 @@ class Bond:
         df = pd.DataFrame({'time': self.bead1.time, 'bond_length': bonds_traj})
         df.to_csv(f'bond_{self.idx + 1}{tag}.xvg', header=False, index=False, sep='\t')
         self.df_dist = pd.DataFrame({'bond_length': bin_edges, 'p_aa': hist})
+        self.fitting = fitting
         if fitting == 'least_square':
             self.beta = 1000 / 8.314 / T
             self.b0_aa = bonds_traj.mean()
-            popt, score = curve_fit_rsq(f=self.func1, xdata=bin_edges, ydata=hist)
+            func = lambda x, k: self.func(x, self.b0_aa, k)
+            popt, score = curve_fit_rsq(f=func, xdata=bin_edges, ydata=hist)
             self.kb_aa = popt[0]
             if score < 0.9:
                 warnings.warn(f'Bond {self.idx + 1}: Bead{self.bead1.idx + 1}-Bead{self.bead2.idx + 1} '
                               f'may have multiple equilibrium distance.')
-            self.df_dist['p_fit'] = self.func1(bin_edges, *popt)
+            self.df_dist['p_fit'] = func(bin_edges, *popt)
         elif fitting == 'mean_variance':
             self.beta = 1000 / 8.314 / T
             self.b0_aa = bonds_traj.mean()
-            self.kb_aa = 1 / (2 * self.beta * bonds_traj.var())
+            self.kb_aa = 1 / (self.beta * bonds_traj.var())
             self.df_dist['p_fit'] = self.func(bin_edges, self.b0_aa, self.kb_aa)
         else:
             raise ValueError(f'fitting algorithm invalid: {fitting}.')
@@ -74,21 +76,29 @@ class Bond:
                                        density=True)
         self.df_dist[f'p_cg_{self.n_iter}'] = hist
         if not self.IsConstraint:
-            dev_b0 = self.b0_aa - bonds_traj_cg.mean()
-            self.b0 += dev_b0 * learning_rate
-            self.b0 = np.clip(self.b0, self.b0_aa / limit, self.b0_aa * limit)
-            kb_cg = 1 / (2 * self.beta * bonds_traj_cg.var())
-            mul_kb = self.kb_aa / kb_cg
-            self.kb += self.kb * (mul_kb - 1) * learning_rate
-            self.kb = np.clip(self.kb, self.kb_aa / limit, self.kb_aa * limit)
-
-    def func1(self, x, k):
-        V = k * (x - self.b0) ** 2
-        return np.exp(- V * self.beta) / np.sqrt(np.pi / self.beta / k)
+            if self.fitting == 'mean_variance':
+                dev_b0 = self.b0_aa - bonds_traj_cg.mean()
+                self.b0 += dev_b0 * learning_rate
+                self.b0 = np.clip(self.b0, self.b0_aa / limit, self.b0_aa * limit)
+                kb_cg = 1 / (2 * self.beta * bonds_traj_cg.var())
+                mul_kb = self.kb_aa / kb_cg
+                self.kb += self.kb * (mul_kb - 1) * learning_rate
+                self.kb = np.clip(self.kb, self.kb_aa / limit, self.kb_aa * limit)
+            elif self.fitting == 'least_square':
+                try:
+                    bin_edges = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
+                    b0 = bonds_traj_cg.mean()
+                    func = lambda x, k: self.func(x, b0, k)
+                    popt, score = curve_fit_rsq(f=func, xdata=bin_edges, ydata=hist)
+                    kb = popt[0]
+                    self.b0 += (self.b0_aa - b0) * learning_rate
+                    self.kb += (self.kb_aa - kb) * learning_rate
+                except:
+                    warnings.warn(f'square least fit error: no update for the parameters of bond {self.idx + 1}')
 
     def func(self, x, b0, k):
-        V = k * (x - b0) ** 2
-        return np.exp(- V * self.beta) / np.sqrt(np.pi / self.beta / k)
+        V = k / 2 * (x - b0) ** 2
+        return np.exp(- V * self.beta) / np.sqrt(2 * np.pi / self.beta / k)
 
     @staticmethod
     def calculate_distance(A, B):
