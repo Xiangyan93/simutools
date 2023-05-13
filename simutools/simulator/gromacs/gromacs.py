@@ -148,19 +148,20 @@ class GROMACS:
             cmd += f' -ntomp {ntomp}'
         execute(cmd)
 
-    def fix_charge(self, itp: str, total_charge: List[int] = None):
+    def fix_charge(self, itp: str):
         with open(itp) as f:
             contents = f.read()
         itp_parser = ITPParser(itp)
         itp_parser.parse()
-        assert len(itp_parser.molecules) == len(total_charge)
+        # assert len(itp_parser.molecules) == len(total_charge)
         for i, m in enumerate(itp_parser.molecules.values()):
             charges = np.array(m.charges).astype('float')
-            if abs(charges.sum() - total_charge[i]) < 1e-10:
+            int_charge = round(charges.sum())
+            if abs(charges.sum() - int_charge) < 1e-10:
                 continue
             else:
                 idx = find_index_of_max_unique_abs(charges)
-                charges[idx[0]] += (total_charge[i] - charges.sum()) / len(idx)
+                charges[idx[0]] += (int_charge - charges.sum()) / len(idx)
                 charge_old = m.charges[idx[0]]
                 charge_new = '%.8f' % charges[idx[0]]
                 assert contents.count(charge_old) == len(idx)

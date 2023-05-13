@@ -52,7 +52,7 @@ def main(args: CommonArgs):
         amber = AMBER()
         amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, resName=args.res_name)
 
-        gmx.fix_charge(f'{args.name}.top', total_charge=[0, 0])
+        gmx.fix_charge(f'{args.name}.top')
         gmx.insert_molecules(f'{args.name}.gro', outgro='output.gro')
         gmx.solvate('output.gro', top=f'{args.name}.top', outgro='initial.gro')
 
