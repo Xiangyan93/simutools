@@ -44,7 +44,9 @@ class CommonArgs(Tap):
     ntomp: int = None
     """number of OpenMP threads for gmx"""
     n_steps: int = 5000000
-
+    """"""
+    mol_name: List[str]
+    """"""
     def process_args(self) -> None:
         assert len(self.box_size) == 3
         valid_index= []
@@ -58,13 +60,10 @@ class CommonArgs(Tap):
 def main(args: CommonArgs):
     cd_and_mkdir(args.save_dir)
     pdb_files = []
-    res_name = []
     for gro in args.gro_list:
         pdb = gro.split('/')[-1].split('.')[0] + '.pdb'
         universe = gro2pdb('../' + gro, pdb)
         assert len(universe.residues) == 1
-        for residue in universe.residues:
-            res_name.append(residue.resname)
         pdb_files.append(pdb)
     packmol = Packmol('packmol')
     packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size)
@@ -77,7 +76,7 @@ def main(args: CommonArgs):
     gmx.generate_top(f'CG.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
                                               f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',
                                               f'{TEMPLATE_DIR}/martini_v3.0.0_ions_v1.itp'] + itp_list,
-                     mol_name=res_name, mol_number=args.n_mol_list)
+                     mol_name=args.mol_name, mol_number=args.n_mol_list)
     gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
     gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=1000000, dt=0.005,
                                    tcoupl='v-rescale', tau_t='1.0',
