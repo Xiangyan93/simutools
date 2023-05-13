@@ -55,6 +55,7 @@ class CommonArgs(Tap):
                 valid_index.append(i)
         self.gro_list = [self.gro_list[i] for i in valid_index]
         self.n_mol_list = [self.n_mol_list[i] for i in valid_index]
+        self.mol_name = [self.mol_name[i] for i in valid_index]
 
 
 def main(args: CommonArgs):
