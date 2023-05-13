@@ -47,6 +47,8 @@ class CommonArgs(Tap):
     """"""
     mol_name: List[str]
     """"""
+    PME: bool = False
+    """"""
     def process_args(self) -> None:
         assert len(self.box_size) == 3
         valid_index= []
@@ -84,12 +86,20 @@ def main(args: CommonArgs):
                                    pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',
                                    rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
-                                   restart=True,
-                                   tcoupl='v-rescale', tau_t='1.0',
-                                   pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
-                                   constraints='none', coulombtype='cutoff', rcoulomb='1.1',
-                                   rvdw='1.1', dielectric=15, nstlist=20)
+    if args.PME:
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
+                                       restart=True,
+                                       tcoupl='v-rescale', tau_t='1.0',
+                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       constraints='none', coulombtype='PME', rcoulomb='1.4',
+                                       rvdw='1.1', dielectric=15, nstlist=20)
+    else:
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
+                                       restart=True,
+                                       tcoupl='v-rescale', tau_t='1.0',
+                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       constraints='none', coulombtype='reaction-field', rcoulomb='1.4',
+                                       rvdw='1.1', dielectric=15, nstlist=20)
     gmx.grompp(gro='bulk.gro', mdp='CG_em.mdp', top=f'CG.top', tpr=f'CG_em.tpr')
     gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
     gmx.grompp(gro=f'CG_em.gro', mdp='CG_eq.mdp', top=f'CG.top', tpr=f'CG_eq.tpr',
