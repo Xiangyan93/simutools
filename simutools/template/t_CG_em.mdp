@@ -7,5 +7,5 @@ cutoff-scheme   = verlet
 coulombtype     = cut-off
 epsilon-r       = %dielectric%
 
-rcoulomb        = 0.8
-rvdw            = 0.8
+rcoulomb        = 1.1
+rvdw            = 1.1
