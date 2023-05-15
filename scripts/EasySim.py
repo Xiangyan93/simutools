@@ -63,15 +63,17 @@ class CommonArgs(Tap):
 
 def main(args: CommonArgs):
     cd_and_mkdir(args.save_dir)
-    pdb_files = []
-    for gro in args.gro_list:
-        pdb = gro.split('/')[-1].split('.')[0] + '.pdb'
-        universe = gro2pdb('../' + gro, pdb)
-        assert len(universe.residues) == 1
-        pdb_files.append(pdb)
-    packmol = Packmol('packmol')
-    packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size)
-    pdb2gro('bulk.pdb', 'bulk.gro', [x * 10 for x in args.box_size] + [90., 90., 90.])
+    if not os.path.exists('bulk.gro'):
+        pdb_files = []
+        for gro in args.gro_list:
+            pdb = gro.split('/')[-1].split('.')[0] + '.pdb'
+            universe = gro2pdb('../' + gro, pdb)
+            assert len(universe.residues) == 1
+            pdb_files.append(pdb)
+        packmol = Packmol('packmol')
+        packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
+                          tolerance=4.0)
+        pdb2gro('bulk.pdb', 'bulk.gro', [x * 10 for x in args.box_size] + [90., 90., 90.])
     gmx = GROMACS(gmx_exe_mdrun='gmx')
     itp_list = []
     for itp in args.itp_list:
@@ -82,7 +84,7 @@ def main(args: CommonArgs):
                                               f'{TEMPLATE_DIR}/martini_v3.0.0_ions_v1.itp'] + itp_list,
                      mol_name=args.mol_name, mol_number=args.n_mol_list)
     gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
-    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
+    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=500000, dt=0.005, nstxtcout=10000,
                                    tcoupl='v-rescale', tau_t='1.0',
                                    pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',

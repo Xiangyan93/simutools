@@ -22,7 +22,7 @@ class CommonArgs(Tap):
     """residual name"""
     smiles: str = None
     """SMILES of the molecule."""
-    action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg', 'stability']
+    action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg', 'stability', 'em']
     """action to be conducted."""
     dihedral_no_force: List[int] = []
     """dihedral index without potential"""
@@ -136,6 +136,16 @@ def main(args: CommonArgs):
             for bead in mapping.groups:
                 bead.position = None
             os.chdir('..')
+    elif args.action == 'em':
+        cd_and_mkdir('4.em')
+        shutil.copy(f'../CG_{args.name}.itp', '.')
+        gmx.generate_top(f'CG_{args.name}.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
+                                                              f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',
+                                                              f'CG_{args.name}.itp'],
+                         mol_name=[args.res_name], mol_number=[1])
+        gmx.grompp(gro=f'../3.bond-opt/CG_{args.name}.gro', mdp='../3.bond-opt/CG_em.mdp',
+                   top=f'CG_{args.name}.top', tpr=f'CG_em.tpr')
+        gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
     elif args.action == 'stability':
         cd_and_mkdir('4.stability')
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
