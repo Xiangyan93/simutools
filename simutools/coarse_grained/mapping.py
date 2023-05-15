@@ -262,13 +262,13 @@ class Mapping:
                 return
             f.write('\n[ constraints ]\n')
             for bond in self.constraints:
-                assert bond.IsConstraint
+                assert bond.IsInRing
                 f.write('%7d%7d     1%10.5f\n' % (bond.bead1.idx + 1, bond.bead2.idx + 1, bond.b0))
                 if group:
                     f.write(';\n')
             f.write('\n[ bonds ]\n')
             for bond in self.bonds:
-                assert not bond.IsConstraint
+                assert not bond.IsInRing
                 f.write('%7d%7d     1%10.5f%14.5f\n' % (bond.bead1.idx + 1, bond.bead2.idx + 1, bond.b0, bond.kb))
                 if group:
                     f.write(';\n')
@@ -376,7 +376,7 @@ class Mapping:
         bonds = []
         constraints = []
         for bond in self.bonds:
-            if bond.IsConstraint:
+            if bond.IsInRing:
                 constraints.append(bond)
             else:
                 bonds.append(bond)

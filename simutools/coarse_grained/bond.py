@@ -23,25 +23,11 @@ class Bond:
         return [self.bead1.idx, self.bead2.idx]
 
     @property
-    def IsConstraint(self) -> bool:
-        if self.bead1.IsPartAromatic and self.bead2.IsPartAromatic:
-            for ring_idx in self.bead1.raw_rings_idx:
-                if set(ring_idx) in [set(g) for g in self.bead2.raw_rings_idx]:
-                    assert self.kb_aa > 20000
-                    return True
-        if self.kb_aa > 20000:
-            return True
-        else:
-            return False
-        """
-        if self.bead1.IsPartAromatic and self.bead2.IsPartAromatic:
-            for ring_idx in self.bead1.raw_rings_idx:
-                if set(ring_idx) in [set(g) for g in self.bead2.raw_rings_idx]:
-                    return True
-        elif self.bead1.IsSugar and self.bead2.IsSugar:
-            return True
+    def IsInRing(self) -> bool:
+        for bead in self.bead1.neighbors:
+            if bead in self.bead2.neighbors:
+                return True
         return False
-        """
 
     @property
     def n_iter(self) -> int:
@@ -94,7 +80,7 @@ class Bond:
         hist, bin_edges = np.histogram(bonds_traj_cg, bins=200, range=[self.min, self.max],
                                        density=True)
         self.df_dist[f'p_cg_{self.n_iter}'] = hist
-        if not self.IsConstraint:
+        if not self.IsInRing:
             if self.n_iter > 1 and self.emd(self.n_iter - 1) > self.emd(self.n_iter - 2):
                 self.b0 = self.b0_old
                 self.kb = self.kb_old
