@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import warnings
 from scipy.integrate import trapz
+from scipy.stats import wasserstein_distance
 from .bead import Bead
 from ..utils import curve_fit_rsq
 
@@ -81,30 +82,43 @@ class Angle:
         self.ka = self.ka_aa
         self.df_dist['p_fit'] = self.func1(bin_edges, self.a0_rad_aa, self.ka_aa)
 
+    def emd(self, n_iter):
+        """Earth Mover's distance. Wassertein's distance."""
+        return wasserstein_distance(self.df_dist['angle'], self.df_dist['angle'],
+                                    self.df_dist['p_aa'], self.df_dist[f'p_cg_{n_iter}'])
+        # dx = np.deg2rad(self.df_dist['angle'][1] - self.df_dist['angle'][0])
+        # return (self.df_dist['p_aa'] - self.df_dist[f'p_cg_{n_iter}']).abs().sum() * dx
+
     def update_cg_distribution(self, learning_rate=0.01, limit: float = 1.5):
         angles_rad_traj_cg = self.calculate_angle(self.bead1.position, self.bead2.position, self.bead3.position)
         hist, bin_edges = np.histogram(angles_rad_traj_cg, bins=360, range=[0, np.pi], density=True)
         self.df_dist[f'p_cg_{self.n_iter}'] = hist
-        if self.fitting == 'least_square':
-            try:
-                bin_edges = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
-                a0_rad = angles_rad_traj_cg.mean()
-                a0_degree = np.degrees(a0_rad)
-                popt, score = curve_fit_rsq(f=self.func(a0=a0_rad), xdata=bin_edges, ydata=hist)
-                ka = popt[0]
-                self.a0 += (self.a0_degree_aa - a0_degree) * learning_rate
-                assert self.a0 < 180.0
-                self.ka += (self.ka_aa - ka) * learning_rate
-            except:
-                warnings.warn(f'square least fit error: no update for the parameters of angle {self.idx + 1}')
-        elif self.fitting == 'mean_variance':
-            dev_a0 = self.a0_rad_aa - angles_rad_traj_cg.mean()
-            self.a0 += np.degrees(dev_a0) * learning_rate
-            self.a0 = np.clip(self.a0, self.a0_degree_aa / limit, self.a0_degree_aa * limit)
-            ka_cg = 1 / (self.beta * angles_rad_traj_cg.var())
-            mul_ka = self.ka_aa / ka_cg
-            self.ka += self.ka * (mul_ka - 1) * learning_rate
-            self.ka = np.clip(self.ka, self.ka_aa / limit, self.ka_aa * limit)
+        if self.n_iter > 1 and self.emd(self.n_iter - 1) > self.emd(self.n_iter - 2):
+            self.a0 = self.a0_old
+            self.ka = self.ka_old
+        else:
+            self.a0_old = self.a0
+            self.ka_old = self.ka
+            if self.fitting == 'least_square':
+                try:
+                    bin_edges = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
+                    a0_rad = angles_rad_traj_cg.mean()
+                    a0_degree = np.degrees(a0_rad)
+                    popt, score = curve_fit_rsq(f=self.func(a0=a0_rad), xdata=bin_edges, ydata=hist)
+                    ka = popt[0]
+                    self.a0 += (self.a0_degree_aa - a0_degree) * learning_rate
+                    assert self.a0 < 180.0
+                    self.ka += (self.ka_aa - ka) * learning_rate
+                except:
+                    warnings.warn(f'square least fit error: no update for the parameters of angle {self.idx + 1}')
+            elif self.fitting == 'mean_variance':
+                dev_a0 = self.a0_rad_aa - angles_rad_traj_cg.mean()
+                self.a0 += np.degrees(dev_a0) * learning_rate
+                self.a0 = np.clip(self.a0, self.a0_degree_aa / limit, self.a0_degree_aa * limit)
+                ka_cg = 1 / (self.beta * angles_rad_traj_cg.var())
+                mul_ka = self.ka_aa / ka_cg
+                self.ka += self.ka * (mul_ka - 1) * learning_rate
+                self.ka = np.clip(self.ka, self.ka_aa / limit, self.ka_aa * limit)
 
     def func10(self, x, a0, k, c):
         V = k / 2 * ((np.cos(x) - np.cos(a0))/np.sin(x)) ** 2 + c

@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import math
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
 import pandas as pd
 import warnings
+from scipy.stats import wasserstein_distance
 from .bead import Bead
 from .angle import Angle
 from ..utils import curve_fit_rsq
@@ -223,9 +225,18 @@ class Dihedral:
     def _pbc(v, p_min, p_max):
         assert p_max > p_min
         periodic = p_max - p_min
-        v = np.where(v < p_min, np.fmod(v, periodic) + periodic, v)
-        v = np.where(v >= p_max, np.fmod(v, periodic) - periodic, v)
+        while len(np.where(v < p_min)[0]) != 0:
+            v = np.where(v < p_min, v + periodic, v)
+        while len(np.where(v >= p_max)[0]) != 0:
+            v = np.where(v >= p_max, v - periodic, v)
         return v
+
+    def emd(self, n_iter):
+        """Earth Mover's distance. Wassertein's distance."""
+        return wasserstein_distance(self.df_dist['dihedral'], self.df_dist['dihedral'],
+                                    self.df_dist['p_aa'], self.df_dist[f'p_cg_{n_iter}'])
+        # dx = np.deg2rad(self.df_dist['dihedral'][1] - self.df_dist['dihedral'][0])
+        # return (self.df_dist['p_aa'] - self.df_dist[f'p_cg_{n_iter}']).abs().sum() * dx
 
     def update_cg_distribution(self, learning_rate=0.1):
         dihedrals_rad_traj_cg = self.calculate_dihedral(self.bead1.position, self.bead2.position, self.bead3.position,
@@ -233,52 +244,74 @@ class Dihedral:
         hist, bin_edges = np.histogram(dihedrals_rad_traj_cg, bins=90, range=[0, 2 * np.pi], density=True)
         bin_edges = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
         self.df_dist[f'p_cg_{self.n_iter}'] = hist
-        if self.func_type == 1:
-            if not (self.k1 == 0 and self.k2 == 0 and self.k3 == 0):
+        if self.NoForce:
+            return
+        elif self.n_iter > 1 and self.emd(self.n_iter - 1) > self.emd(self.n_iter - 2):
+            if self.func_type == 1:
+                self.k1, self.s1, self.k2, self.s2, self.k3, self.s3 = \
+                    self.k1_old, self.s1_old, self.k2_old, self.s2_old, self.k3_old, self.s3_old
+            elif self.func_type == 2:
+                self.d0, self.kd = self.d0_old, self.kd_old
+            elif self.func_type == 3:
+                self.C1, self.C2, self.C3, self.C4, self.C5 = \
+                    self.C1_old, self.C2_old, self.C3_old, self.C4_old, self.C5_old
+            elif self.func_type == 11:
+                self.a0, self.a1, self.a2, self.a3, self.a4 = \
+                    self.a0_old, self.a1_old, self.a2_old, self.a3_old, self.a4_old
+        else:
+            if self.func_type == 1:
+                self.k1_old, self.s1_old, self.k2_old, self.s2_old, self.k3_old, self.s3_old = \
+                    self.k1, self.s1, self.k2, self.s2, self.k3, self.s3
+                if not (self.k1 == 0 and self.k2 == 0 and self.k3 == 0):
+                    try:
+                        k1, s1, k2, s2, k3, s3, best_func, best_popt, score, _ = self.fit1(bin_edges, hist, f_idx=self.f_idx)
+                        self.k1 += (self.k1_aa - k1) * learning_rate
+                        self.s1 += self._pbc(self.s1_aa - s1, -180., 180.) * learning_rate
+                        self.k2 += (self.k2_aa - k2) * learning_rate
+                        self.s2 += self._pbc(self.s2_aa - s2, -180., 180.) * learning_rate
+                        self.k3 += (self.k3_aa - k3) * learning_rate
+                        self.s3 += self._pbc(self.s3_aa - s3, -180., 180.) * learning_rate
+                    except:
+                        warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
+            elif self.func_type == 2:
+                self.d0_old, self.kd_old = self.d0, self.kd
+                dihedrals_rad_traj_cg = self._pbc(dihedrals_rad_traj_cg,
+                                                  dihedrals_rad_traj_cg[0] - np.pi,
+                                                  dihedrals_rad_traj_cg[0] + np.pi)
+                #print('qq: ', self.d0)
+                dev_d0 = self._pbc(self.d0_rad_aa - dihedrals_rad_traj_cg.mean(), - np.pi, np.pi)
+                self.d0 = self._pbc(self.d0 + np.degrees(dev_d0) * learning_rate, 0, 360)
+                # print(np.degrees(dev_d0), self.d0)
+                # self.a0 = np.clip(self.a0, self.a0_degree_aa / limit, self.a0_degree_aa * limit)
+                kd_cg = 1 / (2 * self.beta * dihedrals_rad_traj_cg.var())
+                mul_kd = self.kd_aa / kd_cg
+                self.kd += self.kd * (mul_kd - 1) * learning_rate
+                # self.kd = np.clip(self.kd, self.kd_aa / limit, self.kd_aa * limit)
+            elif self.func_type == 3:
+                self.C1_old, self.C2_old, self.C3_old, self.C4_old, self.C5_old = \
+                    self.C1, self.C2, self.C3, self.C4, self.C5
                 try:
-                    k1, s1, k2, s2, k3, s3, best_func, best_popt, score, _ = self.fit1(bin_edges, hist, f_idx=self.f_idx)
-                    self.k1 += (self.k1_aa - k1) * learning_rate
-                    self.s1 += self._pbc(self.s1_aa - s1, -180., 180.) * learning_rate
-                    self.k2 += (self.k2_aa - k2) * learning_rate
-                    self.s2 += self._pbc(self.s2_aa - s2, -180., 180.) * learning_rate
-                    self.k3 += (self.k3_aa - k3) * learning_rate
-                    self.s3 += self._pbc(self.s3_aa - s3, -180., 180.) * learning_rate
+                    C0, C1, C2, C3, C4, C5, best_func, best_popt, score, _ = self.fit3(bin_edges, hist, f_idx=self.f_idx)
+                    self.C1 += (self.C1_aa - C1) * learning_rate
+                    self.C2 += (self.C2_aa - C2) * learning_rate
+                    self.C3 += (self.C3_aa - C3) * learning_rate
+                    self.C4 += (self.C4_aa - C4) * learning_rate
+                    self.C5 += (self.C5_aa - C5) * learning_rate
                 except:
                     warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
-        elif self.func_type == 2:
-            dihedrals_rad_traj_cg = self._pbc(dihedrals_rad_traj_cg,
-                                              dihedrals_rad_traj_cg[0] - np.pi,
-                                              dihedrals_rad_traj_cg[0] + np.pi)
-            #print('qq: ', self.d0)
-            dev_d0 = self._pbc(self.d0_rad_aa - dihedrals_rad_traj_cg.mean(), - np.pi, np.pi)
-            self.d0 = self._pbc(self.d0 + np.degrees(dev_d0) * learning_rate, 0, 360)
-            # print(np.degrees(dev_d0), self.d0)
-            # self.a0 = np.clip(self.a0, self.a0_degree_aa / limit, self.a0_degree_aa * limit)
-            kd_cg = 1 / (2 * self.beta * dihedrals_rad_traj_cg.var())
-            mul_kd = self.kd_aa / kd_cg
-            self.kd += self.kd * (mul_kd - 1) * learning_rate
-            # self.kd = np.clip(self.kd, self.kd_aa / limit, self.kd_aa * limit)
-        elif self.func_type == 3:
-            try:
-                C0, C1, C2, C3, C4, C5, best_func, best_popt, score, _ = self.fit3(bin_edges, hist, f_idx=self.f_idx)
-                self.C1 += (self.C1_aa - C1) * learning_rate
-                self.C2 += (self.C2_aa - C2) * learning_rate
-                self.C3 += (self.C3_aa - C3) * learning_rate
-                self.C4 += (self.C4_aa - C4) * learning_rate
-                self.C5 += (self.C5_aa - C5) * learning_rate
-            except:
-                warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
-        else:
-            assert self.func_type == 11
-            try:
-                _, a1, a2, a3, a4, best_func, best_popt, score, _ = self.fit11(bin_edges, hist, f_idx=self.f_idx)
-                self.a1 += (self.a1_aa - a1) * learning_rate
-                self.a2 += (self.a2_aa - a2) * learning_rate
-                self.a3 += (self.a3_aa - a3) * learning_rate
-                self.a4 += (self.a4_aa - a4) * learning_rate
-                self.a0 = 11.5 - self.a1 - self.a2 - self.a3 - self.a4
-            except:
-                warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
+            else:
+                assert self.func_type == 11
+                self.a0_old, self.a1_old, self.a2_old, self.a3_old, self.a4_old = \
+                    self.a0, self.a1, self.a2, self.a3, self.a4
+                try:
+                    _, a1, a2, a3, a4, best_func, best_popt, score, _ = self.fit11(bin_edges, hist, f_idx=self.f_idx)
+                    self.a1 += (self.a1_aa - a1) * learning_rate
+                    self.a2 += (self.a2_aa - a2) * learning_rate
+                    self.a3 += (self.a3_aa - a3) * learning_rate
+                    self.a4 += (self.a4_aa - a4) * learning_rate
+                    self.a0 = 11.5 - self.a1 - self.a2 - self.a3 - self.a4
+                except:
+                    warnings.warn(f'square least fit error: no update for the parameters of dihedral {self.idx + 1}')
 
     def func1(self, x, c, k1, s1, k2, s2, k3, s3):
         V = k1 * (1 + np.cos(x - s1)) + k2 * (1 + np.cos(x * 2 - s2)) + k3 * (1 + np.cos(x * 3 - s3)) + c
@@ -330,3 +363,13 @@ class Dihedral:
             if angle.CBT:
                 return True
         return False
+
+    @property
+    def NoForce(self) -> bool:
+        if hasattr(self, 'no_force'):
+            return self.no_force
+        else:
+            for b1 in self.bead2.neighbors:
+                if b1 in self.bead3.neighbors:
+                    return True
+            return False

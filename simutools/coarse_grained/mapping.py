@@ -134,19 +134,15 @@ class Mapping:
         for i, bead in enumerate(self.groups):
             bead.idx = i
         self.bonds = []
-        self.constraints = []
         for i, bead1 in enumerate(self.groups):
             for j in range(i + 1, len(self.groups)):
                 bead2 = self.groups[j]
                 if bead2 in bead1.neighbors:
                     bond = Bond(bead1, bead2, idx=len(self.bonds))
-                    if bond.IsConstraint:
-                        self.constraints.append(bond)
-                    else:
-                        self.bonds.append(bond)
+                    self.bonds.append(bond)
 
         self.virtual_sites = []
-        for bond in self.constraints:
+        for bond in self.bonds:
             if bond.bead1.IsSugar and bond.bead2.IsSugar:
                 for vs in self.virtual_sites:
                     if bond.bead1 in vs.beads or bond.bead2 in vs.beads:
@@ -284,6 +280,8 @@ class Mapping:
                     f.write(';\n')
             f.write('\n[ dihedrals ]\n')
             for dihedral in self.dihedrals:
+                if dihedral.NoForce:
+                    continue
                 if dihedral.func_type == 1:
                     if dihedral.k1 != 0:
                         f.write('%7d%7d%7d%7d     1%10.3f%10.3f%5d\n' % (dihedral.bead1.idx + 1, dihedral.bead2.idx + 1,
@@ -372,14 +370,25 @@ class Mapping:
             group.position = np.array([U.atoms[i].position for ts in U.trajectory]) / 10  # unit in nm
             group.time = [ts.time for ts in U.trajectory]
 
-    def get_aa_distribution(self, tag: str = '', dihedral_n1_180=[]):
-        for i, bond in enumerate(self.bonds + self.constraints):
+    def get_aa_distribution(self, tag: str = '', dihedral_with_force=[], dihedral_no_force=[]):
+        for i, bond in enumerate(self.bonds):
             bond.get_aa_distribution(tag=tag, fitting='mean_variance')
+        bonds = []
+        constraints = []
+        for bond in self.bonds:
+            if bond.IsConstraint:
+                constraints.append(bond)
+            else:
+                bonds.append(bond)
+        self.bonds = bonds
+        self.constraints = constraints
         for i, angle in enumerate(self.angles):
             angle.get_aa_distribution(tag=tag, fitting='mean_variance')
         for i, dihedral in enumerate(self.dihedrals):
-            if i + 1 in dihedral_n1_180:
-                dihedral.fix_s1 = 0.
+            if i + 1 in dihedral_no_force:
+                dihedral.no_force = True
+            if i + 1 in dihedral_with_force:
+                dihedral.no_force = False
             dihedral.get_aa_distribution(tag=tag)
 
     def update_parameter(self):
@@ -415,7 +424,10 @@ class Mapping:
                 axs[0, i].fill_between(bond.df_dist['bond_length'], bond.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, bond in enumerate(self.bonds):
-            axs[1, i].set_title(f'bond {i + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}')
+            title = f'bond {i + 1}: {bond.bead1.idx + 1}-{bond.bead2.idx + 1}'
+            if CG:
+                title += ';emd=%.2f' % bond.emd(bond.n_iter - 1)
+            axs[1, i].set_title(title)
             axs[1, i].plot(bond.df_dist['bond_length'], bond.df_dist['p_aa'], color='red', label='AA')
             axs[1, i].fill_between(bond.df_dist['bond_length'], bond.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -429,8 +441,11 @@ class Mapping:
                 axs[1, i].fill_between(bond.df_dist['bond_length'], bond.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, angle in enumerate(self.angles):
-            axs[2, i].set_title(
-                f'angle {i + 1}(funct={angle.func_type}): {angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1}')
+            title = f'angle {i + 1}({angle.bead1.idx + 1}-{angle.bead2.idx + 1}-{angle.bead3.idx + 1})' \
+                    f';funct={angle.func_type}'
+            if CG:
+                title += ';emd=%.2f' % angle.emd(angle.n_iter - 1)
+            axs[2, i].set_title(title)
             axs[2, i].plot(angle.df_dist['angle'], angle.df_dist['p_aa'], color='red', label='AA')
             axs[2, i].fill_between(angle.df_dist['angle'], angle.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -444,9 +459,15 @@ class Mapping:
                 axs[2, i].fill_between(angle.df_dist['angle'], angle.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         for i, dihedral in enumerate(self.dihedrals):
-            axs[3, i].set_title(
-                f'dihedral {i + 1}(funct={dihedral.func_type}): {dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-'
-                f'{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1}')
+            if dihedral.NoForce:
+                title = f'dihedral {i + 1}({dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1})' \
+                        f';funct=none'
+            else:
+                title = f'dihedral {i + 1}({dihedral.bead1.idx + 1}-{dihedral.bead2.idx + 1}-{dihedral.bead3.idx + 1}-{dihedral.bead4.idx + 1})' \
+                        f';funct={dihedral.func_type}'
+            if CG:
+                title += ';emd=%.2f' % dihedral.emd(dihedral.n_iter - 1)
+            axs[3, i].set_title(title)
             axs[3, i].plot(dihedral.df_dist['dihedral'], dihedral.df_dist['p_aa'], color='red', label='AA')
             axs[3, i].fill_between(dihedral.df_dist['dihedral'], dihedral.df_dist['p_aa'], 0, color='red', alpha=0.5)
             if CG:
@@ -460,6 +481,27 @@ class Mapping:
                 axs[3, i].fill_between(dihedral.df_dist['dihedral'], dihedral.df_dist[f'p_fit'], 0,
                                        color='green', alpha=0.5)
         plt.savefig(file, format=file.split('.')[1])
+
+    def write_emd(self, file: str = 'emd.log'):
+        with open(file, 'w') as f:
+            f.write('Wasserstein distances for bonds:\n')
+            bemds = []
+            for bond in self.bonds:
+                bemds.append(bond.emd(bond.n_iter - 1))
+                f.write('%3d,%.3f\n' % (bond.idx + 1, bemds[-1]))
+            f.write('Wasserstein distances for angles:\n')
+            aemds = []
+            for angle in self.angles:
+                aemds.append(angle.emd(bond.n_iter - 1))
+                f.write('%3d,%.3f\n' % (angle.idx + 1, aemds[-1]))
+            f.write('Wasserstein distances for dihedrals:\n')
+            demds = []
+            for dihedral in self.dihedrals:
+                demds.append(dihedral.emd(bond.n_iter - 1))
+                f.write('%3d,%.3f\n' % (dihedral.idx + 1, demds[-1]))
+            f.write('Average Wasserstein distances for bonds: %.3f\n' % np.mean(bemds))
+            f.write('Average Wasserstein distances for angles: %.3f\n' % np.mean(aemds))
+            f.write('Average Wasserstein distances for dihedrals: %.3f\n' % np.mean(demds))
 
     def generate_mapping_img(self):
         from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D

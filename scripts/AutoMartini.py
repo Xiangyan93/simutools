@@ -24,8 +24,10 @@ class CommonArgs(Tap):
     """SMILES of the molecule."""
     action: Literal['all-atom', 'cg-mapping', 'cg-sim', 'test', 'bond-opt', 'swarm-cg', 'stability']
     """action to be conducted."""
-    dihedral_n1_180: List[int] = []
-    """dihedral index with periodicity of 360 degrees and balanced angle of 180 degrees"""
+    dihedral_no_force: List[int] = []
+    """dihedral index without potential"""
+    dihedral_with_force: List[int] = []
+    """dihedral index with potential"""
     ntmpi: int = None
     """number of MPI threads for gmx"""
     ntomp: int = None
@@ -82,7 +84,8 @@ def main(args: CommonArgs):
             mapping.generate_ndx_mapping(f'{args.name}.ndx')
             mapping.load_aa_traj('../1.all-atom/AA-traj.whole.xtc', '../1.all-atom/run.tpr')
             mapping.save(filename='temp.pkl')
-        mapping.get_aa_distribution(dihedral_n1_180=args.dihedral_n1_180)
+        mapping.get_aa_distribution(dihedral_no_force=args.dihedral_no_force,
+                                    dihedral_with_force=args.dihedral_with_force)
         mapping.write_distribution(file='aa-distribution.svg', CG=False, fit=True)
         # mapping.generate_itp(f'CG_{args.name}.itp', resName=args.res_name)
         # mapping.generate_gro(file=f'CG_{args.name}.gro', resName=args.res_name, box_length=3.8)
@@ -101,11 +104,11 @@ def main(args: CommonArgs):
                                        pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff',
                                        rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=1000000, dt=0.01, nstxtcout=20,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=1000000, dt=0.01, nstxtcout=10,
                                        restart=True,
                                        tcoupl='v-rescale', tau_t='0.1',
                                        pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                       constraints='none', coulombtype='cutoff', rcoulomb='1.1',
+                                       constraints='none', coulombtype='reaction-field', rcoulomb='1.1',
                                        rvdw='1.1', dielectric=15, nstlist=20)
         gmx.solvate(f'CG_{args.name}.gro', top=f'CG_{args.name}.top', outgro='CG_initial.gro',
                     solvent=f'{TEMPLATE_DIR}/box_martini3_water.gro')
@@ -129,6 +132,7 @@ def main(args: CommonArgs):
             mapping.load_cg_traj(f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr')
             mapping.update_parameter()
             mapping.write_distribution(CG=True)
+            mapping.write_emd()
             for bead in mapping.groups:
                 bead.position = None
             os.chdir('..')

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os.path
 import shutil
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 from tap import Tap
@@ -43,8 +44,8 @@ class CommonArgs(Tap):
     """number of MPI threads for gmx"""
     ntomp: int = None
     """number of OpenMP threads for gmx"""
-    n_steps: int = 5000000
-    """"""
+    n_runs: int
+    """Each simulation is 20,000,000 steps. The runs are simulated one by one."""
     mol_name: List[str]
     """"""
     PME: bool = False
@@ -81,33 +82,38 @@ def main(args: CommonArgs):
                                               f'{TEMPLATE_DIR}/martini_v3.0.0_ions_v1.itp'] + itp_list,
                      mol_name=args.mol_name, mol_number=args.n_mol_list)
     gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
-    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=2000000, dt=0.002,
-                                   tcoupl='v-rescale', tau_t='0.2',
+    gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
+                                   tcoupl='v-rescale', tau_t='1.0',
                                    pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',
                                    rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
     if args.PME:
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=20000000, dt=0.01, nstxtcout=10000,
                                        restart=True,
                                        tcoupl='v-rescale', tau_t='1.0',
-                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='PME', rcoulomb='1.1',
                                        rvdw='1.1', dielectric=15, nstlist=20)
     else:
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=args.n_steps, dt=0.005, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=20000000, dt=0.01, nstxtcout=10000,
                                        restart=True,
                                        tcoupl='v-rescale', tau_t='1.0',
-                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='reaction-field', rcoulomb='1.1',
                                        rvdw='1.1', dielectric=15, nstlist=20)
-    gmx.grompp(gro='bulk.gro', mdp='CG_em.mdp', top=f'CG.top', tpr=f'CG_em.tpr')
-    gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
-    gmx.grompp(gro=f'CG_em.gro', mdp='CG_eq.mdp', top=f'CG.top', tpr=f'CG_eq.tpr',
-               maxwarn=2)
-    gmx.mdrun(tpr=f'CG_eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
-    gmx.grompp(gro=f'CG_eq.gro', mdp='CG_run.mdp', top=f'CG.top', tpr=f'CG_run.tpr',
-               maxwarn=1)
-    gmx.mdrun(tpr=f'CG_run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+    if not os.path.exists('CG_em.gro'):
+        gmx.grompp(gro='bulk.gro', mdp='CG_em.mdp', top=f'CG.top', tpr=f'CG_em.tpr')
+        gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+    if not os.path.exists('CG_eq.gro'):
+        gmx.grompp(gro=f'CG_em.gro', mdp='CG_eq.mdp', top=f'CG.top', tpr=f'CG_eq.tpr',
+                   maxwarn=2)
+        gmx.mdrun(tpr=f'CG_eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+    for i in range(args.n_runs):
+        if not os.path.exists(f'CG_run_{i}.gro'):
+            gro = 'CG_eq.gro' if i == 0 else f'CG_run_{i-1}.gro'
+            gmx.grompp(gro=gro, mdp='CG_run.mdp', top=f'CG.top', tpr=f'CG_run_{i}.tpr',
+                       maxwarn=1)
+            gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
 
 if __name__ == '__main__':
