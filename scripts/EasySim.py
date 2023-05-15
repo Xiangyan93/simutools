@@ -88,14 +88,14 @@ def main(args: CommonArgs):
                                    constraints='none', coulombtype='cutoff',
                                    rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
     if args.PME:
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=20000000, dt=0.01, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=10000000, dt=0.01, nstxtcout=10000,
                                        restart=True,
                                        tcoupl='v-rescale', tau_t='1.0',
                                        pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
                                        constraints='none', coulombtype='PME', rcoulomb='1.1',
                                        rvdw='1.1', dielectric=15, nstlist=20)
     else:
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=20000000, dt=0.01, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=10000000, dt=0.01, nstxtcout=10000,
                                        restart=True,
                                        tcoupl='v-rescale', tau_t='1.0',
                                        pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
