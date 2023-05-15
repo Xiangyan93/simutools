@@ -86,7 +86,7 @@ def main(args: CommonArgs):
     gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
     gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=500000, dt=0.005, nstxtcout=10000,
                                    tcoupl='v-rescale', tau_t='1.0',
-                                   pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                   pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
                                    constraints='none', coulombtype='cutoff',
                                    rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
     if args.PME:
