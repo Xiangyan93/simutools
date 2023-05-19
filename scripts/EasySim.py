@@ -72,7 +72,7 @@ def main(args: CommonArgs):
             pdb_files.append(pdb)
         packmol = Packmol('packmol')
         packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
-                          tolerance=6)
+                          tolerance=6.0)
         pdb2gro('bulk.pdb', 'bulk.gro', [x * 10 for x in args.box_size] + [90., 90., 90.])
     gmx = GROMACS(gmx_exe_mdrun='gmx')
     itp_list = []
