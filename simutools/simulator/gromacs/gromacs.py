@@ -142,13 +142,14 @@ class GROMACS:
         assert os.path.exists(tpr), f'{tpr} not exists.'
         name = tpr.split('.')[0]
         cmd = f'{self.gmx_analysis} -quiet -nobackup mdrun -v -deffnm {name}'
-        if os.path.exists(f'{name}.cpt'):
-            cmd += f' -cpi {name}.cpt'
         if ntmpi is not None:
             cmd += f' -ntmpi {ntmpi}'
         if ntomp is not None:
             cmd += f' -ntomp {ntomp}'
-        execute(cmd)
+        if os.path.exists(f'{name}.cpt'):
+            execute(cmd + f' -cpi {name}.cpt')
+            if not os.path.exists(f'{name}.gro'):
+                execute(cmd)
 
     def fix_charge(self, itp: str):
         with open(itp) as f:
