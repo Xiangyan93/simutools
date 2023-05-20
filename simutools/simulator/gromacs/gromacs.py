@@ -150,6 +150,8 @@ class GROMACS:
             execute(cmd + f' -cpi {name}.cpt')
             if not os.path.exists(f'{name}.gro'):
                 execute(cmd)
+        else:
+            execute(cmd)
 
     def fix_charge(self, itp: str):
         with open(itp) as f:
