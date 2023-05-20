@@ -142,6 +142,8 @@ class GROMACS:
         assert os.path.exists(tpr), f'{tpr} not exists.'
         name = tpr.split('.')[0]
         cmd = f'{self.gmx_analysis} -quiet -nobackup mdrun -v -deffnm {name}'
+        if os.path.exists(f'{name}.cpt'):
+            cmd += f' -cpi {name}.cpt'
         if ntmpi is not None:
             cmd += f' -ntmpi {ntmpi}'
         if ntomp is not None:
@@ -204,3 +206,14 @@ class GROMACS:
         assert os.path.exists(xvg), f'{xvg} not exists.'
         cmd = f'{self.gmx_analysis} -quiet -nobackup analyze -f {xvg} -dist {dist} --xvg none -bw {bw}'
         execute(cmd,)
+
+    def energy(self, xvg: str, edr: str, select: str):
+        assert os.path.exists(edr), f'{edr} not exists.'
+        cmd = f'{self.gmx_analysis} -quiet -nobackup energy -f {edr} -o {xvg}'
+        execute(cmd, input=f'{select}')
+
+    def sasa(self, xvg: str, traj: str, tpr: str, select):
+        assert os.path.exists(traj), f'{traj} not exists.'
+        assert os.path.exists(tpr), f'{tpr} not exists.'
+        cmd = f'{self.gmx_analysis} -quiet -nobackup sasa -f {traj} -s {tpr} -o {xvg}'
+        execute(cmd, input=f'{select}')
