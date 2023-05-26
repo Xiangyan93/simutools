@@ -78,7 +78,7 @@ def main(args: CommonArgs):
         if os.path.exists('temp.pkl'):
             mapping = Mapping.load(filename='temp.pkl')
         else:
-            mol2 = f'../1.all-atom/{args.name}.mol2'
+            mol2 = f'../1.all-atom/{args.name}_ob.mol2'
             mapping = Mapping(mol2=mol2)
             mapping.mapping()
             mapping.generate_mapping_img()
