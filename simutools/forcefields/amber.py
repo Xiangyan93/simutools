@@ -31,10 +31,10 @@ class AMBER:
         if resName is None:
             resName = ''.join(random.choice(string.ascii_uppercase) for _ in range(3))
         cmds = []
-        if not os.path.exists(f'{name}_ob.mol2'):
-            cmds.append(f'obabel -:{smiles} {name} -omol2 -p {pH} -r --conformer --gen3d --weighted -h --ff GAFF --partialcharge eem -O {name}_ob.mol2')
         if not os.path.exists(f'{name}.mol2'):
-            cmds.append(f'antechamber -i {name}_ob.mol2 -fi mol2 -o {name}.mol2 -rn {resName} -fo mol2 -c bcc -s 1 -nc {charge}')
+            cmds.append(f'obabel -:{smiles} {name} -omol2 -p {pH} -r --conformer --gen3d --weighted -h --ff GAFF --partialcharge eem -O {name}.mol2')
+        # if not os.path.exists(f'{name}.mol2'):
+        #     cmds.append(f'antechamber -i {name}_ob.mol2 -fi mol2 -o {name}.mol2 -rn {resName} -fo mol2 -c bcc -s 1 -nc {charge}')
         cmds += [
             f'parmchk2 -i {name}.mol2 -f mol2 -o {name}.frcmod -s gaff2 -a Y',
             f'tleap -f tleap.in'
