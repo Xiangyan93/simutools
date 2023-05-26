@@ -100,6 +100,7 @@ class Bead:
             'C5,N5a': 'N4a',  # ketone is N5a, benzaldehyde is N4a
             'C5,C3': 'C4',  #
             'C5,P1': 'N6',  # Phenol
+            'N6,P1': 'P1',  # bi-Phenol
             'C5,C6': 'C6',  # Thiophenol
             'C5,X4e': 'X4e',  # fluorobenzene
             'C5,X2': 'X2',  # bromobenzene
@@ -441,8 +442,8 @@ class Bead:
         matches = self.mol.GetSubstructMatches(Chem.MolFromSmarts(sugar_smarts))
         for match in matches:
             _ = set([i in match for i in self.atom_idx])
-            assert _ != {True, False}
-            if set(_) == {True}:
+            # assert _ != {True, False}
+            if set(_) == {True} and 8 in [atom.GetAtomicNum() for atom in self.atoms]:
                 return True
         else:
             return False

@@ -482,7 +482,7 @@ class Mapping:
                                        color='green', alpha=0.5)
         plt.savefig(file, format=file.split('.')[1])
 
-    def write_emd(self, file: str = 'emd.log'):
+    def write_emd(self, file: str = 'emd.log') -> float:
         with open(file, 'w') as f:
             f.write('Wasserstein distances for bonds:\n')
             bemds = []
@@ -502,6 +502,7 @@ class Mapping:
             f.write('Average Wasserstein distances for bonds: %.3f\n' % np.mean(bemds))
             f.write('Average Wasserstein distances for angles: %.3f\n' % np.mean(aemds))
             f.write('Average Wasserstein distances for dihedrals: %.3f\n' % np.mean(demds))
+        return np.mean(bemds) + np.mean(aemds) + np.mean(demds)
 
     def generate_mapping_img(self):
         from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D

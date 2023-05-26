@@ -4,6 +4,7 @@ import shutil
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 from tap import Tap
 import os
+import numpy as np
 from rdkit import Chem
 from simutools.forcefields.amber import AMBER
 from simutools.simulator.gromacs.gromacs import GROMACS
@@ -112,6 +113,7 @@ def main(args: CommonArgs):
                                        rvdw='1.1', dielectric=15, nstlist=20)
         gmx.solvate(f'CG_{args.name}.gro', top=f'CG_{args.name}.top', outgro='CG_initial.gro',
                     solvent=f'{TEMPLATE_DIR}/box_martini3_water.gro')
+        emds = []
         for i in range(args.n_iter):
             print(f'Iteration: {i}\n')
             cd_and_mkdir(f'iteration_{i}')
@@ -132,10 +134,11 @@ def main(args: CommonArgs):
             mapping.load_cg_traj(f'CG_run_{i}_pbc.xtc', tpr=f'CG_run_{i}.tpr')
             mapping.update_parameter()
             mapping.write_distribution(CG=True)
-            mapping.write_emd()
+            emds.append(mapping.write_emd())
             for bead in mapping.groups:
                 bead.position = None
             os.chdir('..')
+        print('Best iteration %d: emd=%f\n' % (np.argmin(emds), min(emds)))
     elif args.action == 'em':
         cd_and_mkdir('4.em')
         shutil.copy(f'../CG_{args.name}.itp', '.')

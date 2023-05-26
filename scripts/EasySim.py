@@ -88,12 +88,13 @@ def main(args: CommonArgs):
                                                       f'{TEMPLATE_DIR}/martini_v3.0.0_ions_v1.itp'] + itp_list,
                              mol_name=args.mol_name, mol_number=args.n_mol_list)
             gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=15.0)
-            gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
-                                           tcoupl='v-rescale', tau_t='1.0',
-                                           pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
-                                           constraints='none', coulombtype='cutoff',
-                                           rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
             if args.PME:
+                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005,
+                                               nstxtcout=10000,
+                                               tcoupl='v-rescale', tau_t='1.0',
+                                               pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
+                                               constraints='none', coulombtype='PME',
+                                               rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
                                                restart=True,
                                                tcoupl='v-rescale', tau_t='1.0',
@@ -101,6 +102,12 @@ def main(args: CommonArgs):
                                                constraints='none', coulombtype='PME', rcoulomb='1.1',
                                                rvdw='1.1', dielectric=15, nstlist=20)
             else:
+                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005,
+                                               nstxtcout=10000,
+                                               tcoupl='v-rescale', tau_t='1.0',
+                                               pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
+                                               constraints='none', coulombtype='reaction-field',
+                                               rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
                                                restart=True,
                                                tcoupl='v-rescale', tau_t='1.0',
