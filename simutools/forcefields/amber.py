@@ -53,6 +53,6 @@ class AMBER:
                     amber += pmd.load_file(f'{TEMPLATE_DIR}/sodium.top', xyz=f'{TEMPLATE_DIR}/sodium.gro')
             if tip3p:
                 amber += pmd.load_file(f'{TEMPLATE_DIR}/tip3p.top', xyz=f'{TEMPLATE_DIR}/tip3p.gro')
-            amber.save(f'{name}.top')
+            amber.save(f'{name}.top', overwrite=True)
             amber.strip(f':SOL')
-            amber.save(f'{name}.gro')
+            amber.save(f'{name}.gro', overwrite=True)
