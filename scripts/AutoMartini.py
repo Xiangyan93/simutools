@@ -52,26 +52,27 @@ def main(args: CommonArgs):
     if args.action == 'all-atom':
         assert args.smiles is not None
         cd_and_mkdir('1.all-atom')
-        amber = AMBER()
-        amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, resName=args.res_name)
+        if not os.path.exists('run.gro'):
+            amber = AMBER()
+            amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, resName=args.res_name)
 
-        gmx.fix_charge(f'{args.name}.top')
-        gmx.insert_molecules(f'{args.name}.gro', outgro='output.gro')
-        gmx.solvate('output.gro', top=f'{args.name}.top', outgro='initial.gro')
+            gmx.fix_charge(f'{args.name}.top')
+            gmx.insert_molecules(f'{args.name}.gro', outgro='output.gro')
+            gmx.solvate('output.gro', top=f'{args.name}.top', outgro='initial.gro')
 
-        gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
-        gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'{args.name}.top', tpr='em.tpr')
-        gmx.mdrun(tpr='em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+            gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
+            gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'{args.name}.top', tpr='em.tpr')
+            gmx.mdrun(tpr='em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
-        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq.mdp', nsteps=200000, dt=0.002)
-        gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'{args.name}.top', tpr='eq.tpr')
-        gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+            gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq.mdp', nsteps=200000, dt=0.002)
+            gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'{args.name}.top', tpr='eq.tpr')
+            gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=100,
-                                       restart=True)
-        gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'{args.name}.top', tpr='run.tpr')
-        gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
-        gmx.trjconv(gro='run.xtc', out_gro='AA-traj.whole.xtc', tpr='run.tpr', pbc_whole=True)
+            gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=100,
+                                           restart=True)
+            gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'{args.name}.top', tpr='run.tpr')
+            gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+            gmx.trjconv(gro='run.xtc', out_gro='AA-traj.whole.xtc', tpr='run.tpr', pbc_whole=True)
     elif args.action == 'cg-mapping':
         cd_and_mkdir('2.cg-mapping')
         # use MDAnalysis
