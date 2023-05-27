@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import subprocess
 from subprocess import Popen, PIPE
 import os
@@ -103,3 +104,32 @@ def curve_fit_rsq(f, xdata, ydata, guess=None, bounds=None, weights=None) -> (fl
     rsq = 1 - ss_res / ss_tot
 
     return popt, rsq
+
+
+def generate_slurm(name: str, walltime: int = 168, nodes: str = 'cpu', gpu: int = 0, mem: int = None,
+                   ntasks: int = None, commands: List[str] = None, exclude: str = None):
+    file = open('%s.sh' % name, 'w')
+    info = '#!/bin/bash\n'
+    info += '#SBATCH -D %s\n' % os.getcwd()
+    info += '#SBATCH -N 1\n'
+    info += '#SBATCH --job-name=%s\n' % name
+    if mem is not None:
+        info += '#SBATCH --mem=%dG\n' % mem
+    info += '#SBATCH -o %s.out\n' % name
+    info += '#SBATCH -e %s.err\n' % name
+    info += '#SBATCH --partition=%s\n' % nodes
+    if ntasks is not None:
+        info += '#SBATCH --ntasks=%i\n' % ntasks
+    if gpu != 0:
+        info += '#SBATCH --gres=gpu:%i\n' % gpu
+        info += '#SBATCH --exclusive\n'
+    if exclude is not None:
+        info += '#SBATCH --exclude=%s\n' % exclude
+    info += '#SBATCH --time=%i:0:0\n' % walltime
+    # info += 'source ~/.zshrc\n'
+    info += 'echo $SLURM_NODELIST > %s.time\n' % name
+    info += 'echo $(date) >> %s.time\n' % name
+    for cmd in commands:
+        info += cmd + '\n'
+    info += '\necho $(date) >> %s.time' % name
+    file.write(info)
