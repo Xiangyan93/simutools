@@ -92,6 +92,7 @@ class Mapping:
             groups += group.ring_split()
         for group in groups:
             if group.bead_type is None:
+                print(group.atom_idx)
                 assert group.IsAlkane
                 group.bead_type = 'C1'
         self.groups = groups

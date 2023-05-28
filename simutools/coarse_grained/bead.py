@@ -94,17 +94,18 @@ class Bead:
     def add_bead(self, group):
         merge_bead_type = {
             'P1,P1': 'P4r',
+            'N6,P1': 'P1',  # bi-Phenol
             'N4a,N4a': 'N4a',  # double ether OCCO
-            'C5,X3': 'X3',
+            'C5,C3': 'C4',  #
+            'C5,C6': 'C6',  # Thiophenol
             'C5,N4a': 'N2a',  # ether is N4a, benzene-ether is N2a
             'C5,N5a': 'N4a',  # ketone is N5a, benzaldehyde is N4a
-            'C5,C3': 'C4',  #
+            'C5,N6d': 'N6d',  # primary amine
             'C5,P1': 'N6',  # Phenol
-            'N6,P1': 'P1',  # bi-Phenol
-            'C5,C6': 'C6',  # Thiophenol
-            'C5,X4e': 'X4e',  # fluorobenzene
-            'C5,X2': 'X2',  # bromobenzene
             'C5,X1': 'X1',  # Iodobenzene
+            'C5,X2': 'X2',  # bromobenzene
+            'C5,X3': 'X3',
+            'C5,X4e': 'X4e',  # fluorobenzene
         }
         merge_idx = self.atom_idx + group.atom_idx
         print(1, self.bead_type)

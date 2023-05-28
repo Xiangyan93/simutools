@@ -18,6 +18,7 @@ martini3bible = {
     '[N;1H]C(=O)[N;1H]': 'P3',
     '[N;0H]C(=O)[N;0H]': 'P3a',
     'CS(=O)C': 'P6',
+    'S(=O)(=O)O': 'P6',
     # 3-atom substructure
     'C(=O)[N;1H]': 'P3',
     'C(=O)[N;0H]': 'P3a',
@@ -27,13 +28,14 @@ martini3bible = {
     # 2-atom substructure
     'S(=O)': 'P6',
     '[C;H1](=O)': 'N6a',
+    'N=N': 'N4',  # diazene
     # 1-atom functional group
     '[O;D1;H0]': 'N5a',  # ketone
     '[O;D2;H0]': 'N4a',  # ether
     '[O;D2;H1]': 'P1',  # hydroxyl
-    '[N;D1]': 'N6a',
-    '[N;D2]': 'N4',
-    '[N;D3]': 'N3a',
+    '[N;D3;H2]': 'N6d',  # primary amine
+    '[N;D3;H1]': 'N4',  # secondary amine
+    '[N;D3;H0]': 'N3a',  # tertiary amine
     '[S]': 'C6',
     '[F]': 'X4e',
     '[Cl]': 'X3',
