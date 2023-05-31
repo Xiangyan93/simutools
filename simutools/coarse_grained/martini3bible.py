@@ -18,7 +18,8 @@ martini3bible = {
     '[N;1H]C(=O)[N;1H]': 'P3',
     '[N;0H]C(=O)[N;0H]': 'P3a',
     'CS(=O)C': 'P6',
-    'S(=O)(=O)O': 'P6',
+    'S(=O)(=O)[O;H1]': 'P6',
+    'S(=O)(=O)[O-]': 'Q4n',
     # 3-atom substructure
     'C(=O)[N;1H]': 'P3',
     'C(=O)[N;0H]': 'P3a',

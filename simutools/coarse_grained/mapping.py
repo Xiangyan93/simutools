@@ -4,14 +4,14 @@ from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import os
 import pickle
 import MDAnalysis as mda
-from MDAnalysis.analysis import distances
+from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import Draw
 import numpy as np
 import pandas as pd
 import warnings
-from itertools import permutations
+from openbabel import openbabel
 import matplotlib.pyplot as plt
 from ..utils import mol_to_nx, merge_lists
 from .bead import Bead, VirtualSite
@@ -25,6 +25,13 @@ class Mapping:
     def __init__(self, mol2):
         self.mol2 = mol2
         self.mol = Chem.rdmolfiles.MolFromMol2File(mol2, sanitize=True, removeHs=False)
+        if self.mol is None:
+            obConversion = openbabel.OBConversion()
+            obConversion.SetInAndOutFormats("mol2", "pdb")
+            mol = openbabel.OBMol()
+            obConversion.ReadFile(mol, mol2)  # Replace with your .mol2 file
+            obConversion.WriteFile(mol, mol2[:-4] + 'pdb')
+            self.mol = Chem.MolFromPDBFile(mol2[:-4] + 'pdb', sanitize=True, removeHs=False)
         # assign all hydrogen to its connected heavy atom
         self.h_belong_map = {}
         for atom in self.mol.GetAtoms():
@@ -100,7 +107,7 @@ class Mapping:
         self.update_connectivity()
         for i, group in enumerate(self.groups):
             for group_ in group.neighbors:
-                if len(group_) == 1 and len(group_.neighbors) == 1 and len(self.groups[i]) != 1 and not group_.confirm:
+                if len(group_) == 1 and len(group_.neighbors) == 1 and not group_.confirm:
                     self.groups[i] = self.groups[i].add_bead(group_)
                     group_.atom_idx.pop(0)
         self.groups = [group for group in self.groups if group.atom_idx]
@@ -109,6 +116,7 @@ class Mapping:
             self.update_connectivity()
             for i, group in enumerate(self.groups):
                 if len(group) == 1 and not group.confirm:
+                    print(group.atom_idx)
                     assert len(group.neighbors) != 1
                     merge_ranks = [group_.merge_rank() for group_ in group.neighbors]
                     merge_idx = merge_ranks.index(max(merge_ranks))
@@ -506,7 +514,6 @@ class Mapping:
         return np.mean(bemds) + np.mean(aemds) + np.mean(demds)
 
     def generate_mapping_img(self):
-        from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
         mol = Chem.RemoveHs(self.mol)
         mol.RemoveAllConformers()
         highlightAtoms = []
@@ -518,10 +525,14 @@ class Mapping:
                 if i == 0:
                     mol.GetAtomWithIdx(idx).SetProp('atomNote', f'{bead.bead_type}')
             for bond in bead.bonds:
-                highlightBonds.append(bond.GetIdx())
+                bond_RemoveHs = mol.GetBondBetweenAtoms(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+                highlightBonds.append(bond_RemoveHs.GetIdx())
         opts = Draw.DrawingOptions()
         opts.bgColor = None
         d = rdMolDraw2D.MolDraw2DSVG(500, 500)
+        print(highlightBonds)
+        print(len(mol.GetBonds()))
+        print(len(self.mol.GetBonds()))
         rdMolDraw2D.PrepareAndDrawMolecule(d, mol, highlightAtoms=highlightAtoms, highlightBonds=highlightBonds)
         d.FinishDrawing()
         with open('mapping.svg', 'w') as f:
