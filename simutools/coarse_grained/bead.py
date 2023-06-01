@@ -223,6 +223,13 @@ class Bead:
                             g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx,
                                                                      ring_idx_wba[j * 2:(j + 1) * 2])
                             groups.append(g)
+                    else:
+                        g = Bead(mol=self.mol,
+                                 graph_heavy=self.graph_heavy,
+                                 atom_idx=ring_idx_wba)
+                        g.bead_type = self.get_bead_type_of_pair_ring_atoms(ring_idx_wba)
+                        g.raw_rings_idx = self.get_raw_rings_idx(self.raw_rings_idx, ring_idx_wba)
+                        groups.append(g)
                 # six atoms are non-bridged in a 6-member ring
                 elif so == 4:
                     assert len(ring_idx) == len(ring_idx_wba)
@@ -281,7 +288,6 @@ class Bead:
             graph.remove_nodes_from(used_atoms)
             groups_idx = list(nx.connected_components(graph))
             for i, group_idx in enumerate(groups_idx):
-                print(group_idx)
                 group_idx = list(group_idx)
                 group = Bead(mol=self.mol,
                              graph_heavy=self.graph_heavy,
@@ -375,16 +381,18 @@ class Bead:
             atom1 = self.mol.GetAtomWithIdx(pair_idx[0])
             atom2 = self.mol.GetAtomWithIdx(pair_idx[1])
             atom3 = self.mol.GetAtomWithIdx(pair_idx[2])
-            if sorted([atom1.GetAtomicNum(), atom2.GetAtomicNum(), atom3.GetAtomicNum()]) == [6, 6, 7]:
-                if atom1.GetAtomicNum() == 7:
-                    nitrogen_atom = atom1
-                elif atom2.GetAtomicNum() == 7:
-                    nitrogen_atom = atom2
+            if [atom1.GetAtomicNum(), atom2.GetAtomicNum(), atom3.GetAtomicNum()] == [8, 6, 8]:
+                if self.mol.GetBondBetweenAtoms(atom1.GetIdx(), atom2.GetIdx()).GetBondTypeAsDouble() == 1 and \
+                        self.mol.GetBondBetweenAtoms(atom2.GetIdx(), atom3.GetIdx()).GetBondTypeAsDouble() == 1:
+                    return 'N5d'
                 else:
-                    nitrogen_atom = atom3
-                if nitrogen_atom.FormalCharge() == 0:
-                    if nitrogen_atom.GetTotalNumHs() == 0:
-                        return
+                    raise ValueError
+            elif [atom1.GetAtomicNum(), atom2.GetAtomicNum(), atom3.GetAtomicNum()] == [6, 6, 6]:
+                if self.mol.GetBondBetweenAtoms(atom1.GetIdx(), atom2.GetIdx()).GetBondTypeAsDouble() == 1 and \
+                        self.mol.GetBondBetweenAtoms(atom2.GetIdx(), atom3.GetIdx()).GetBondTypeAsDouble() == 1:
+                    return 'C3'
+                else:
+                    raise ValueError
             else:
                 raise ValueError
         else:

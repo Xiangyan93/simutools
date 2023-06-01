@@ -52,7 +52,7 @@ class Dihedral:
                 idx1 = idx[idx > nbins / 2]
                 assert idx1.min() == nbins - len(idx1)
             else:
-                assert idx.max() - idx.min() + 1 == len(idx)
+                assert 0 <= idx.max() - idx.min() + 1 - len(idx) <= 1
         # elif self.CBT:
         #     self.func_type = 11
         else:

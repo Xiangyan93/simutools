@@ -99,11 +99,19 @@ class Mapping:
             groups += group.ring_split()
         for group in groups:
             if group.bead_type is None:
-                print(group.atom_idx)
                 assert group.IsAlkane
                 group.bead_type = 'C1'
         self.groups = groups
         # step4, merge single-connected single-heavy-atom groups into its neighbor
+        self.update_connectivity()
+        for i, group in enumerate(self.groups):
+            if len(group) == 1:
+                for group_ in group.neighbors:
+                    if len(group_) == 1 and len(group_.neighbors) == 1 and not group_.confirm:
+                        self.groups[i] = self.groups[i].add_bead(group_)
+                        group_.atom_idx.pop(0)
+        self.groups = [group for group in self.groups if group.atom_idx]
+
         self.update_connectivity()
         for i, group in enumerate(self.groups):
             for group_ in group.neighbors:
@@ -116,7 +124,6 @@ class Mapping:
             self.update_connectivity()
             for i, group in enumerate(self.groups):
                 if len(group) == 1 and not group.confirm:
-                    print(group.atom_idx)
                     assert len(group.neighbors) != 1
                     merge_ranks = [group_.merge_rank() for group_ in group.neighbors]
                     merge_idx = merge_ranks.index(max(merge_ranks))
@@ -530,9 +537,6 @@ class Mapping:
         opts = Draw.DrawingOptions()
         opts.bgColor = None
         d = rdMolDraw2D.MolDraw2DSVG(500, 500)
-        print(highlightBonds)
-        print(len(mol.GetBonds()))
-        print(len(self.mol.GetBonds()))
         rdMolDraw2D.PrepareAndDrawMolecule(d, mol, highlightAtoms=highlightAtoms, highlightBonds=highlightBonds)
         d.FinishDrawing()
         with open('mapping.svg', 'w') as f:

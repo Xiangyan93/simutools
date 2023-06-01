@@ -30,6 +30,7 @@ martini3bible = {
     'S(=O)': 'P6',
     '[C;H1](=O)': 'N6a',
     'N=N': 'N4',  # diazene
+    '[C;!R]=[O;D1;H0]': 'N5a',  # ketone
     # 1-atom functional group
     '[O;D1;H0]': 'N5a',  # ketone
     '[O;D2;H0]': 'N4a',  # ether
