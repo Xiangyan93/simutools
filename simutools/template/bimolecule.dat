@@ -1,0 +1,15 @@
+# Calculate the center of mass for each molecule
+COM1: COM ATOMS=%group1%
+COM2: COM ATOMS=%group2%
+
+# Calculate the distance between the two centers of mass
+d: DISTANCE ATOMS=COM1,COM2
+
+# Add a restraining potential if the distance is greater than 4 nm
+UPPER_WALLS ARG=d AT=4.0 KAPPA=100.0
+
+# Perform metadynamics using the distance as the CV
+opes: OPES_METAD ARG=d PACE=500 BARRIER=20
+
+# Print the CV and the bias potential to a file
+PRINT ARG=d,opes.* FILE=COLVAR STRIDE=500

@@ -125,7 +125,7 @@ class GROMACS:
         with open(top) as f:
             contents = f.read()
         if solvent.endswith('spc216.gro'):
-            pattern = re.compile(r'\bSOL\s+1\b')
+            pattern = re.compile(r'\bSOL\s+\d+\b')
             contents = pattern.sub(f'SOL\t\t\t\t\t {matches[1]}', contents)
         elif solvent.endswith('box_martini3_water.gro'):
             contents += f'W\t\t\t\t\t {matches[1]}'
@@ -138,10 +138,14 @@ class GROMACS:
         cmd = f'{self.gmx_analysis} -quiet -nobackup grompp -f {mdp} -c {gro} -p {top} -o {tpr} -maxwarn {maxwarn}'
         execute(cmd)
 
-    def mdrun(self, tpr: str, ntmpi: int = None, ntomp: int = None):
+    def mdrun(self, tpr: str, ntmpi: int = None, ntomp: int = None, plumed: str = None, cpu: bool = False):
         assert os.path.exists(tpr), f'{tpr} not exists.'
         name = tpr.split('.')[0]
         cmd = f'{self.gmx_analysis} -quiet -nobackup mdrun -v -deffnm {name}'
+        if cpu:
+            cmd += ' -nb cpu'
+        if plumed is not None:
+            cmd += f' -plumed {plumed}'
         if ntmpi is not None:
             cmd += f' -ntmpi {ntmpi}'
         if ntomp is not None:
