@@ -138,7 +138,8 @@ class GROMACS:
         cmd = f'{self.gmx_analysis} -quiet -nobackup grompp -f {mdp} -c {gro} -p {top} -o {tpr} -maxwarn {maxwarn}'
         execute(cmd)
 
-    def mdrun(self, tpr: str, ntmpi: int = None, ntomp: int = None, plumed: str = None, cpu: bool = False):
+    def mdrun(self, tpr: str, ntmpi: int = None, ntomp: int = None, plumed: str = None, cpu: bool = False,
+              mpi_format: str = 'mpi'):
         assert os.path.exists(tpr), f'{tpr} not exists.'
         name = tpr.split('.')[0]
         cmd = f'{self.gmx_analysis} -quiet -nobackup mdrun -v -deffnm {name}'
@@ -146,10 +147,16 @@ class GROMACS:
             cmd += ' -nb cpu'
         if plumed is not None:
             cmd += f' -plumed {plumed}'
-        if ntmpi is not None:
-            cmd += f' -ntmpi {ntmpi}'
-        if ntomp is not None:
-            cmd += f' -ntomp {ntomp}'
+        if mpi_format == 'mpi':
+            if ntmpi is not None:
+                cmd = f'mpirun -np {ntmpi} ' + cmd
+            if ntomp is not None:
+                cmd = f'OMP_NUM_THREADS={ntomp} ' + cmd
+        else:
+            if ntmpi is not None:
+                cmd += f' -ntmpi {ntmpi}'
+            if ntomp is not None:
+                cmd += f' -ntomp {ntomp}'
         if os.path.exists(f'{name}.cpt'):
             execute(cmd + f' -cpi {name}.cpt')
             if not os.path.exists(f'{name}.gro'):
