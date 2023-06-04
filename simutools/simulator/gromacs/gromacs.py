@@ -151,7 +151,8 @@ class GROMACS:
             if ntmpi is not None:
                 cmd = f'mpirun -np {ntmpi} ' + cmd
             if ntomp is not None:
-                cmd = f'OMP_NUM_THREADS={ntomp} ' + cmd
+                env = os.environ.copy()
+                env["OMP_NUM_THREADS"] = str(ntomp)
         else:
             if ntmpi is not None:
                 cmd += f' -ntmpi {ntmpi}'
