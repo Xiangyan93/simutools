@@ -9,7 +9,7 @@ d: DISTANCE ATOMS=COM1,COM2
 UPPER_WALLS ARG=d AT=4.0 KAPPA=100.0
 
 # Perform metadynamics using the distance as the CV
-opes: OPES_METAD ARG=d PACE=500 BARRIER=20
+opes: OPES_METAD ARG=d PACE=500 BARRIER=100
 
 # Print the CV and the bias potential to a file
 PRINT ARG=d,opes.* FILE=COLVAR STRIDE=500

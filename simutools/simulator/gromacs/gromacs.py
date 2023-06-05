@@ -109,9 +109,11 @@ class GROMACS:
         with open(mdp_out, 'w') as f_mdp:
             f_mdp.write(contents)
 
-    def insert_molecules(self, gro: str, outgro='output.gro', nmol: int = 1, box: str = '3.8 3.8 3.8', seed: int = 0):
+    def insert_molecules(self, gro: str, ingro=None, outgro='output.gro', nmol: int = 1, box: str = '3.8 3.8 3.8', seed: int = 0):
         assert os.path.exists(gro), f'{gro} not exists.'
         cmd = f'{self.gmx_analysis} -quiet -nobackup insert-molecules -ci {gro} -nmol {nmol} -box {box} -rot xyz -seed {seed} -o {outgro}'
+        if ingro is not None:
+            cmd += f' -f {ingro}'
         execute(cmd)
 
     def solvate(self, gro: str, top: str = None, outgro='output.gro', solvent: str = 'spc216.gro'):

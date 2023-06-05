@@ -56,3 +56,4 @@ class AMBER:
             amber.save(f'{name}.top', overwrite=True)
             amber.strip(f':SOL')
             amber.save(f'{name}.gro', overwrite=True)
+            return amber

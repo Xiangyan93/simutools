@@ -68,52 +68,46 @@ def main(args: CommonArgs):
         if args.smiles is None:
             ff = pmd.load_file(f'../{args.top[0]}', xyz=f'../{args.gro[0]}')
             ff.strip(f':SOL')
+            nmol1 = len(ff.atoms)
+            ff.save(f'mol1.gro', overwrite=True)
+            ff2 = pmd.load_file(f'../{args.top[1]}', xyz=f'../{args.gro[1]}')
+            ff2.strip(f':SOL')
+            ff2.save(f'mol2.gro', overwrite=True)
             ff += pmd.load_file(f'../{args.top[1]}', xyz=f'../{args.gro[1]}')
             ff.save(f'bimolecule.top', overwrite=True)
             ff.strip(f':SOL')
-            ff.save(f'bimolecule.gro', overwrite=True)
         else:
             amber.build(args.smiles[0], 'mol1', charge=args.charge[0], gromacs=True, tip3p=False,
                         resName=args.res_name[0])
             gmx.fix_charge(f'mol1.top')
             ff = pmd.load_file(f'mol1.top', xyz=f'mol1.gro')
+            nmol1 = len(ff.atoms)
             if not args.SameMol:
                 amber.build(args.smiles[1], 'mol2', charge=args.charge[1], gromacs=True, tip3p=False,
                             resName=args.res_name[1])
                 gmx.fix_charge(f'mol2.top')
-                ff += pmd.load_file(f'mol2.top', xyz=f'mol2.gro')
+                ff2 = pmd.load_file(f'mol2.top', xyz=f'mol2.gro')
             else:
-                new_ff = deepcopy(ff)
-                for atom in new_ff.atoms:
-                    atom.xx += 25.0
-                    atom.xy += 25.0
-                    atom.xz += 25.0
-                ff += new_ff
-            ff.save(f'bimolecule.gro', overwrite=True)
+                ff2 = deepcopy(ff)
+                shutil.copyfile('mol1.top', 'mol2.top')
+                shutil.copyfile('mol1.gro', 'mol2.gro')
+            ff += ff2
             ff += pmd.load_file(f'{TEMPLATE_DIR}/tip3p.top', xyz=f'{TEMPLATE_DIR}/tip3p.gro')
             ff.save(f'bimolecule.top', overwrite=True)
 
-        gmx.insert_molecules(f'bimolecule.gro', outgro='output.gro', box='5.0 5.0 5.0')
+        gmx.insert_molecules(f'mol1.gro', outgro='temp.gro', box='5.0 5.0 5.0')
+        gmx.insert_molecules(f'mol2.gro', ingro='temp.gro', outgro='output.gro', box='5.0 5.0 5.0')
         if args.solvent == 'water':
             gmx.solvate('output.gro', top=f'bimolecule.top', outgro='initial.gro')
         else:
             shutil.copyfile('output.gro', 'initial.gro')
             ff.save(f'bimolecule.top', overwrite=True)
 
-        if args.charge[0] != 0:
-            assert ff.residues[1].name in ['NA', 'CL']
-            n = abs(args.charge[0])
-            plumed.generate_dat_from_template('bimolecule.dat', output='plumed.dat',
-                                              group1=f'1-{len(ff.residues[0].atoms)}',
-                                              group2=f'{len(ff.residues[0].atoms) + n + 1}-'
-                                                     f'{len(ff.residues[0].atoms) + n + len(ff.residues[1 + n].atoms)}',
-                                              biasfactor=100)
-        else:
-            plumed.generate_dat_from_template('bimolecule.dat', output='plumed.dat',
-                                              group1=f'1-{len(ff.residues[0].atoms)}',
-                                              group2=f'{len(ff.residues[0].atoms) + 1}-'
-                                                     f'{len(ff.residues[0].atoms) + len(ff.residues[1].atoms)}',
-                                              biasfactor=100)
+        plumed.generate_dat_from_template('bimolecule.dat', output='plumed.dat',
+                                          group1=f'1-{len(ff.residues[0].atoms)}',
+                                          group2=f'{nmol1 + 1}-'
+                                                 f'{nmol1 + len(ff2.residues[0].atoms)}',
+                                          biasfactor=100)
 
         gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
         gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'bimolecule.top', tpr='em.tpr', maxwarn=1)
@@ -128,7 +122,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='eq_nvt.gro', mdp='eq_npt.mdp', top=f'bimolecule.top', tpr='eq_npt.tpr', maxwarn=1)
         gmx.mdrun(tpr='eq_npt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=100,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
                                        restart=True)
         gmx.grompp(gro='eq_nvt.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
@@ -137,7 +131,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'bimolecule.top', tpr='eq.tpr')
         gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
-        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=100,
+        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
                                        restart=True)
         gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
