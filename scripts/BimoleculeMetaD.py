@@ -124,7 +124,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='eq_nvt.gro', mdp='eq_npt.mdp', top=f'bimolecule.top', tpr='eq_npt.tpr', maxwarn=1)
         gmx.mdrun(tpr='eq_npt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=50000000, dt=0.002, nstxtcout=50000,
                                        restart=True)
         gmx.grompp(gro='eq_nvt.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
@@ -133,7 +133,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'bimolecule.top', tpr='eq.tpr')
         gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
-        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
+        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=50000000, dt=0.002, nstxtcout=50000,
                                        restart=True)
         gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
