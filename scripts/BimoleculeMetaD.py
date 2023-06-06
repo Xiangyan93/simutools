@@ -106,9 +106,11 @@ def main(args: CommonArgs):
         plumed.generate_dat_from_template('bimolecule.dat', output='plumed.dat',
                                           group1=f'1-{len(ff.residues[0].atoms)}',
                                           group2=f'{nmol1 + 1}-'
-                                                 f'{nmol1 + len(ff2.residues[0].atoms)}',
-                                          biasfactor=100)
-
+                                                 f'{nmol1 + len(ff2.residues[0].atoms)}')
+        plumed.generate_dat_from_template('bimolecule_eq.dat', output='plumed_eq.dat',
+                                          group1=f'1-{len(ff.residues[0].atoms)}',
+                                          group2=f'{nmol1 + 1}-'
+                                                 f'{nmol1 + len(ff2.residues[0].atoms)}')
         gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
         gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'bimolecule.top', tpr='em.tpr', maxwarn=1)
         gmx.mdrun(tpr='em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
@@ -116,11 +118,11 @@ def main(args: CommonArgs):
     if args.solvent == 'water':
         gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq_nvt.mdp', nsteps=1000000, dt=0.002)
         gmx.grompp(gro='em.gro', mdp='eq_nvt.mdp', top=f'bimolecule.top', tpr='eq_nvt.tpr')
-        gmx.mdrun(tpr='eq_nvt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+        gmx.mdrun(tpr='eq_nvt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'eq_npt.mdp', nsteps=1000000, dt=0.002, pcoupl='berendsen')
         gmx.grompp(gro='eq_nvt.gro', mdp='eq_npt.mdp', top=f'bimolecule.top', tpr='eq_npt.tpr', maxwarn=1)
-        gmx.mdrun(tpr='eq_npt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+        gmx.mdrun(tpr='eq_npt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
                                        restart=True)
@@ -129,7 +131,7 @@ def main(args: CommonArgs):
     else:  # vacuum
         gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq.mdp', nsteps=1000000, dt=0.002)
         gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'bimolecule.top', tpr='eq.tpr')
-        gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+        gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
         gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=10000000, dt=0.002, nstxtcout=10000,
                                        restart=True)
