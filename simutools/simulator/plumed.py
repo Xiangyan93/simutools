@@ -36,14 +36,12 @@ class PLUMED:
         with open(output, 'w') as f_mdp:
             f_mdp.write(contents)
 
-    def get_FES(self, algorithm: Literal['opes'], T: float = 298.0, colvar: str = None):
+    def get_FES(self, algorithm: Literal['opes'], T: float = 298.0, colvar: str = None, kernels: str = None):
         if algorithm == 'opes':
             kbt = T * 0.0083144621  # kJ/mol
             assert colvar is not None
-            with open(colvar, 'r') as f:
-                lines = f.readlines()
-                df = pd.DataFrame([line.split() for line in lines[1:]],
-                                  columns=[lines[0].replace('#! FIELDS ', '').split()])
+            assert kernels is not None
+            df = pd.read_table(colvar, sep='\s+', comment='#', header=None)
 
         else:
             raise ValueError(f'unknown algorithm {algorithm}')
