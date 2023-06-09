@@ -24,7 +24,8 @@ class PLUMED:
             raise ValueError(f'plumed not valid: {self.plumed_exe}')
 
     def generate_dat_from_template(self, template: str, output: str = 'plumed.dat', T: float = 298.0,
-                                   group1: str = '1', group2: str = '2', biasfactor: int = 6):
+                                   group1: str = '1', group2: str = '2', biasfactor: int = 6,
+                                   barrier: float = 20.0, upper_bound: float = 4.0):
         template = f'{TEMPLATE_DIR}/{template}'
         if not os.path.exists(template):
             raise ValueError(f'dat template not found: {template}')
@@ -32,7 +33,8 @@ class PLUMED:
         with open(template) as f_t:
             contents = f_t.read()
         contents = contents.replace('%T%', str(T)).replace('%group1%', group1).replace('%group2%', group2).\
-            replace('%biasfactor%', str(biasfactor))
+            replace('%biasfactor%', str(biasfactor)).replace('%barrier%', str(barrier)).\
+            replace('%upper_bound%', str(upper_bound))
         with open(output, 'w') as f_mdp:
             f_mdp.write(contents)
 
