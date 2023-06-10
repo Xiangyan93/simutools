@@ -39,7 +39,7 @@ class CommonArgs(Tap):
     upper_bound: float = 4.0
     """"""
     extend: int = None
-    """"""
+    """extend the simulation (ps)."""
 
     @property
     def mols(self):
