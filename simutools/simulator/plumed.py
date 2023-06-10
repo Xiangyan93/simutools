@@ -38,7 +38,7 @@ class PLUMED:
         with open(output, 'w') as f_mdp:
             f_mdp.write(contents)
 
-    def generate_dat_centripedal(self, groups: List[List[int]], output: str = 'plumed.dat'):
+    def generate_dat_centripedal(self, groups: List[List[int]], output: str = 'plumed.dat', k: float = 0.1):
         with open(output, 'w') as f:
             for i, group in enumerate(groups):
                 if group[-1] - group[0] == len(group) - 1:
@@ -50,7 +50,7 @@ class PLUMED:
                 f.write(f'd{i+1}: DISTANCE ATOMS=COM1,COM{i+2}\n')
             f.write('UPPER_WALLS ARG=%s AT=%s KAPPA=%s\n' % (','.join([f'd{i+1}' for i, _ in enumerate(groups[1:])]),
                                                              ','.join(['0.0'] * (len(groups) - 1)),
-                                                             ','.join(['0.5'] * (len(groups) - 1))))
+                                                             ','.join([str(k)] * (len(groups) - 1))))
 
     def get_FES(self, algorithm: Literal['opes'], T: float = 298.0, colvar: str = None, kernels: str = None):
         if algorithm == 'opes':

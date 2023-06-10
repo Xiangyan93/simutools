@@ -50,11 +50,13 @@ class CommonArgs(Tap):
     mol_name: List[str]
     """"""
     PME: bool = False
-    """"""
+    """Use PME for electrostatic interaction"""
     n_try: int = 10
     """"""
-    centripedal: bool = False
-    """Apply a centripedal potential to enforce the system to form large nanoparticles."""
+    centripedal: float = None
+    """Apply a centripedal potential to enforce the system to form large nanoparticles. Suggest 0.1 for force 
+    constant."""
+
     def process_args(self) -> None:
         assert len(self.box_size) == 3
         valid_index= []
@@ -77,7 +79,7 @@ def main(args: CommonArgs):
                     universe = gro2pdb('../' + gro, pdb)
                     assert len(universe.residues) == 1
                     pdb_files.append(pdb)
-                if args.centripedal:
+                if args.centripedal is not None:
                     plumed = PLUMED(plumed_exe='plumed')
                     n_beads = [len(mda.Universe(pdb).atoms) for pdb in pdb_files]
                     groups = []
@@ -88,7 +90,7 @@ def main(args: CommonArgs):
                         for j in range(n_mol):
                             groups.append(list(range(n_current, n_current + n_beads[i])))
                             n_current += n_beads[i]
-                    plumed.generate_dat_centripedal(groups=groups)
+                    plumed.generate_dat_centripedal(groups=groups, k=args.centripedal)
                 packmol = Packmol('packmol')
                 packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
                                   tolerance=6.0)
