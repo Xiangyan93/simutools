@@ -8,6 +8,7 @@ import MDAnalysis as mda
 from simutools.utils import cd_and_mkdir
 from simutools.builder.packmol import Packmol
 from simutools.simulator.gromacs.gromacs import GROMACS
+from simutools.simulator.plumed import PLUMED
 from simutools.template import TEMPLATE_DIR
 
 
@@ -52,6 +53,8 @@ class CommonArgs(Tap):
     """"""
     n_try: int = 10
     """"""
+    centripedal: bool = False
+    """Apply a centripedal potential to enforce the system to form large nanoparticles."""
     def process_args(self) -> None:
         assert len(self.box_size) == 3
         valid_index= []
@@ -74,6 +77,18 @@ def main(args: CommonArgs):
                     universe = gro2pdb('../' + gro, pdb)
                     assert len(universe.residues) == 1
                     pdb_files.append(pdb)
+                if args.centripedal:
+                    plumed = PLUMED(plumed_exe='plumed')
+                    n_beads = [len(mda.Universe(pdb).atoms) for pdb in pdb_files]
+                    groups = []
+                    n_current = 1
+                    for i, n_mol in enumerate(args.n_mol_list):
+                        if i >= 2:
+                            break
+                        for j in range(n_mol):
+                            groups.append(list(range(n_current, n_current + n_beads[i])))
+                            n_current += n_beads[i]
+                    plumed.generate_dat_centripedal(groups=groups)
                 packmol = Packmol('packmol')
                 packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
                                   tolerance=6.0)
@@ -95,20 +110,22 @@ def main(args: CommonArgs):
                                                pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
                                                constraints='none', coulombtype='PME',
                                                rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
+                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005,
+                                               nstxtcout=10000,
                                                restart=True,
                                                tcoupl='v-rescale', tau_t='1.0',
                                                pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
                                                constraints='none', coulombtype='PME', rcoulomb='1.1',
                                                rvdw='1.1', dielectric=15, nstlist=20)
             else:
-                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005,
+                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=500000, dt=0.005,
                                                nstxtcout=10000,
                                                tcoupl='v-rescale', tau_t='1.0',
                                                pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
                                                constraints='none', coulombtype='reaction-field',
                                                rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
-                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005, nstxtcout=10000,
+                gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005,
+                                               nstxtcout=10000,
                                                restart=True,
                                                tcoupl='v-rescale', tau_t='1.0',
                                                pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
@@ -117,6 +134,7 @@ def main(args: CommonArgs):
             if not os.path.exists('CG_em.gro'):
                 gmx.grompp(gro='bulk.gro', mdp='CG_em.mdp', top=f'CG.top', tpr=f'CG_em.tpr')
                 gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+
             if not os.path.exists('CG_eq.gro'):
                 gmx.grompp(gro=f'CG_em.gro', mdp='CG_eq.mdp', top=f'CG.top', tpr=f'CG_eq.tpr',
                            maxwarn=2)
@@ -126,11 +144,15 @@ def main(args: CommonArgs):
                     gro = 'CG_eq.gro' if i == 0 else f'CG_run_{i-1}.gro'
                     gmx.grompp(gro=gro, mdp='CG_run.mdp', top=f'CG.top', tpr=f'CG_run_{i}.tpr',
                                maxwarn=1)
-                    gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
+                    if args.centripedal:
+                        gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
+                    else:
+                        gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
         except:
             if os.path.exists('CG_eq.gro'):
                 break
             else:
+                break
                 current_directory = os.getcwd()
                 # Get a list of all files in the current directory
                 files = os.listdir(current_directory)
