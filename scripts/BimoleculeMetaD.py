@@ -38,6 +38,8 @@ class CommonArgs(Tap):
     """number of OpenMP threads for gmx"""
     upper_bound: float = 4.0
     """"""
+    extend: int = None
+    """"""
 
     @property
     def mols(self):
@@ -118,7 +120,7 @@ def main(args: CommonArgs):
                                           group2=f'{nmol1 + 1}-'
                                                  f'{nmol1 + len(ff2.residues[0].atoms)}',
                                           upper_bound=args.upper_bound * 0.9,
-                                          barrier=20 * (args.mol_weight[0] + args.mol_weight[1]) / (464.825 * 2))
+                                          barrier=20 * (args.mol_weight[0] * args.mol_weight[1]) / (464.825 ** 2))
         plumed.generate_dat_from_template('bimolecule_eq.dat', output='plumed_eq.dat',
                                           group1=f'1-{len(ff.residues[0].atoms)}',
                                           group2=f'{nmol1 + 1}-'
@@ -127,6 +129,10 @@ def main(args: CommonArgs):
         gmx.grompp(gro='initial.gro', mdp='em.mdp', top=f'bimolecule.top', tpr='em.tpr', maxwarn=1)
         gmx.mdrun(tpr='em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
 
+    if args.extend is not None:
+        assert os.path.exists('run.gro')
+        gmx.extend_tpr('run.tpr', extend=args.extend)
+        gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
     if args.solvent == 'water':
         gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'eq_nvt.mdp', nsteps=1000000, dt=0.002)
         gmx.grompp(gro='em.gro', mdp='eq_nvt.mdp', top=f'bimolecule.top', tpr='eq_nvt.tpr')

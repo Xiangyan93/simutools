@@ -167,6 +167,10 @@ class GROMACS:
         else:
             execute(cmd)
 
+    def extend_tpr(self, tpr, extend):
+        cmd = '%s -quiet convert-tpr -s %s -o %s -extend %s' % (self.gmx_analysis, tpr, tpr, str(extend))
+        execute(cmd)
+
     def fix_charge(self, itp: str):
         with open(itp) as f:
             contents = f.read()

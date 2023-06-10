@@ -6,7 +6,7 @@ COM2: COM ATOMS=%group2%
 d: DISTANCE ATOMS=COM1,COM2
 
 # Add a restraining potential if the distance is greater than 4 nm
-UPPER_WALLS ARG=d AT=2.5 KAPPA=100.0
+UPPER_WALLS ARG=d AT=4.0 KAPPA=100.0
 
 # Print the CV and the bias potential to a file
 PRINT ARG=d FILE=COLVAR_eq STRIDE=500
