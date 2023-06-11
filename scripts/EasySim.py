@@ -56,6 +56,8 @@ class CommonArgs(Tap):
     centripedal: float = None
     """Apply a centripedal potential to enforce the system to form large nanoparticles. Suggest 0.1 for force 
     constant."""
+    centripedal_mol: int = 2
+    """Apply centripedal forces to the first N-type molecules."""
 
     def process_args(self) -> None:
         assert len(self.box_size) == 3
@@ -85,7 +87,7 @@ def main(args: CommonArgs):
                     groups = []
                     n_current = 1
                     for i, n_mol in enumerate(args.n_mol_list):
-                        if i >= 2:
+                        if i >= args.centripedal_mol:
                             break
                         for j in range(n_mol):
                             groups.append(list(range(n_current, n_current + n_beads[i])))
@@ -146,7 +148,7 @@ def main(args: CommonArgs):
                     gro = 'CG_eq.gro' if i == 0 else f'CG_run_{i-1}.gro'
                     gmx.grompp(gro=gro, mdp='CG_run.mdp', top=f'CG.top', tpr=f'CG_run_{i}.tpr',
                                maxwarn=1)
-                    if args.centripedal:
+                    if args.centripedal is not None and i == 0:
                         gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
                     else:
                         gmx.mdrun(tpr=f'CG_run_{i}.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
