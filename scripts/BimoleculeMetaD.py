@@ -120,7 +120,7 @@ def main(args: CommonArgs):
                                           group2=f'{nmol1 + 1}-'
                                                  f'{nmol1 + len(ff2.residues[0].atoms)}',
                                           upper_bound=args.upper_bound * 0.9,
-                                          barrier=20 * (args.mol_weight[0] * args.mol_weight[1]) / (464.825 ** 2))
+                                          barrier=50)  # 20 * (args.mol_weight[0] * args.mol_weight[1]) / (464.825 ** 2))
         plumed.generate_dat_from_template('bimolecule_eq.dat', output='plumed_eq.dat',
                                           group1=f'1-{len(ff.residues[0].atoms)}',
                                           group2=f'{nmol1 + 1}-'
@@ -142,7 +142,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='eq_nvt.gro', mdp='eq_npt.mdp', top=f'bimolecule.top', tpr='eq_npt.tpr', maxwarn=1)
         gmx.mdrun(tpr='eq_npt.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
-        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=500000000, dt=0.002, nstxtcout=500000,
+        gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'run.mdp', nsteps=50000000, dt=0.002, nstxtcout=500000,
                                        nstenergy=10000, restart=True)
         gmx.grompp(gro='eq_nvt.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
@@ -151,7 +151,7 @@ def main(args: CommonArgs):
         gmx.grompp(gro='em.gro', mdp='eq.mdp', top=f'bimolecule.top', tpr='eq.tpr')
         gmx.mdrun(tpr='eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed_eq.dat')
 
-        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=500000000, dt=0.002, nstxtcout=500000,
+        gmx.generate_mdp_from_template('t_nvt.mdp', mdp_out=f'run.mdp', nsteps=50000000, dt=0.002, nstxtcout=500000,
                                        nstenergy=10000, restart=True)
         gmx.grompp(gro='eq.gro', mdp='run.mdp', top=f'bimolecule.top', tpr='run.tpr')
         gmx.mdrun(tpr='run.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp, plumed='plumed.dat')
