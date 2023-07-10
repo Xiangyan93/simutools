@@ -4,8 +4,10 @@ import os
 import random
 import string
 import shutil
+import re
 import parmed as pmd
 import MDAnalysis as mda
+from rdkit import Chem
 from ..utils import execute
 from ..template import TEMPLATE_DIR
 
@@ -30,9 +32,12 @@ class AMBER:
 
         if resName is None:
             resName = ''.join(random.choice(string.ascii_uppercase) for _ in range(3))
-        cmds = []
         if not os.path.exists(f'{name}_ob.mol2'):
-            cmds.append(f'obabel -:{smiles} {name} -omol2 -p {pH} -r --conformer --gen3d --weighted -h --ff GAFF --partialcharge eem -O {name}_ob.mol2')
+            cmd = f'obabel -:{smiles} {name} -omol2 -p {pH} -r --conformer --gen3d --weighted -h --ff GAFF --partialcharge eem -O {name}_ob.mol2'
+            execute(cmd)
+        mol = Chem.MolFromSmiles(smiles)
+        self.mol2_fix(mol, f'{name}_ob.mol2')
+        cmds = []
         if not os.path.exists(f'{name}.mol2'):
             cmds.append(f'antechamber -i {name}_ob.mol2 -fi mol2 -o {name}.mol2 -rn {resName} -fo mol2 -s 1 -nc {charge}')
         cmds += [
@@ -57,3 +62,32 @@ class AMBER:
             amber.strip(f':SOL')
             amber.save(f'{name}.gro', overwrite=True)
             return amber
+
+    def mol2_fix(self, mol: Chem.Mol, mol2: str):
+        single_bonds = []
+        double_bonds = []
+        # Furan
+        smarts = 'c1ccco1'
+        matches = mol.GetSubstructMatches(Chem.MolFromSmarts(smarts))
+        for match in matches:
+            for i, m in enumerate(match):
+                if i != 0:
+                    assert m > match[i-1]
+            double_bonds.append((match[0], match[1]))
+            double_bonds.append((match[2], match[3]))
+            single_bonds.append((match[0], match[4]))
+            single_bonds.append((match[1], match[2]))
+            single_bonds.append((match[3], match[4]))
+
+        with open(mol2, 'r') as file:
+            contents = file.read()
+        print(single_bonds, double_bonds)
+        # Perform the replacement using regular expressions
+        for i, j in single_bonds:
+            contents = re.sub(r"%d\s+%d\s+ar" % (i + 1, j + 1), "%d    %d    1" % (i + 1, j + 1), contents)
+        for i, j in double_bonds:
+            contents = re.sub(r"%d\s+%d\s+ar" % (i + 1, j + 1), "%d    %d    2" % (i + 1, j + 1), contents)
+
+        # Write the updated contents to the output file
+        with open(mol2, 'w') as file:
+            file.write(contents)
