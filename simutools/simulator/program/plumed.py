@@ -6,13 +6,14 @@ import re
 from MDAnalysis.topology.ITPParser import ITPParser
 import numpy as np
 import pandas as pd
-from ..utils import execute, cd_and_mkdir, find_index_of_max_unique_abs
-from ..template import TEMPLATE_DIR
+from simutools.utils.utils import execute, cd_and_mkdir, find_index_of_max_unique_abs
+from simutools.template import TEMPLATE_DIR
 
 
 class PLUMED:
-    def __init__(self, plumed_exe: str):
-        self.plumed_exe = plumed_exe
+    def __init__(self, exe: str):
+        self.plumed_exe = exe
+        self.tmp_dir = f'{TEMPLATE_DIR}/plumed'
 
     def check_version(self):
         cmd = '%s -h' % self.plumed_exe
@@ -26,7 +27,7 @@ class PLUMED:
     def generate_dat_from_template(self, template: str, output: str = 'plumed.dat', T: float = 298.0,
                                    group1: str = '1', group2: str = '2', biasfactor: int = 6,
                                    barrier: float = 20.0, upper_bound: float = 4.0):
-        template = f'{TEMPLATE_DIR}/{template}'
+        template = f'{self.tmp_dir}/{template}'
         if not os.path.exists(template):
             raise ValueError(f'dat template not found: {template}')
 

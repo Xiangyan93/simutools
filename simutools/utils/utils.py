@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
-import subprocess
-from subprocess import Popen, PIPE
 import os
+import random
+import string
 from collections import Counter
+from subprocess import Popen, PIPE
+
 import networkx as nx
 import numpy as np
 from scipy.optimize import curve_fit
@@ -28,9 +30,33 @@ def execute(cmd: str, input: str = None):
 
 
 def cd_and_mkdir(path: str):
+    create_folder(path)
+    os.chdir(path)
+
+
+def create_missing_folders(path: str):
+    # Split the given path into individual folder names
+    folders = path.split(os.path.sep)
+    if not folders[0]:
+        folders[0] = '/'
+    # Initialize an empty string to build the new path
+    current_path = ""
+
+    # Iterate through each folder and create if it doesn't exist
+    for folder in folders:
+        # Build the current subpath
+        current_path = os.path.join(current_path, folder)
+
+        # Check if the current subpath exists as a directory
+        if not os.path.exists(current_path):
+            # Create the directory
+            os.mkdir(current_path)
+            print(f"Created directory: {current_path}")
+
+
+def create_folder(path: str):
     if not os.path.exists(path):
         os.makedirs(path)
-    os.chdir(path)
 
 
 def all_same(items, tol=1e-6):
@@ -106,30 +132,58 @@ def curve_fit_rsq(f, xdata, ydata, guess=None, bounds=None, weights=None) -> (fl
     return popt, rsq
 
 
-def generate_slurm(name: str, walltime: int = 168, nodes: str = 'cpu', gpu: int = 0, mem: int = None,
-                   ntasks: int = None, commands: List[str] = None, exclude: str = None):
-    file = open('%s.sh' % name, 'w')
-    info = '#!/bin/bash\n'
-    info += '#SBATCH -D %s\n' % os.getcwd()
-    info += '#SBATCH -N 1\n'
-    info += '#SBATCH --job-name=%s\n' % name
-    if mem is not None:
-        info += '#SBATCH --mem=%dG\n' % mem
-    info += '#SBATCH -o %s.out\n' % name
-    info += '#SBATCH -e %s.err\n' % name
-    info += '#SBATCH --partition=%s\n' % nodes
-    if ntasks is not None:
-        info += '#SBATCH --ntasks=%i\n' % ntasks
-    if gpu != 0:
-        info += '#SBATCH --gres=gpu:%i\n' % gpu
-        info += '#SBATCH --exclusive\n'
-    if exclude is not None:
-        info += '#SBATCH --exclude=%s\n' % exclude
-    info += '#SBATCH --time=%i:0:0\n' % walltime
-    # info += 'source ~/.zshrc\n'
-    info += 'echo $SLURM_NODELIST > %s.time\n' % name
-    info += 'echo $(date) >> %s.time\n' % name
-    for cmd in commands:
-        info += cmd + '\n'
-    info += '\necho $(date) >> %s.time' % name
-    file.write(info)
+def random_string(length: int = 8):
+    return ''.join(random.sample(string.ascii_letters, length))
+
+
+def estimate_density_from_formula(f) -> float:
+    # unit: g/mL
+    from .formula import Formula
+    formula = Formula.read(f)
+    string = formula.to_str()
+    density = {
+        'H2': 0.07,
+        'He': 0.15,
+    }
+    if string in density.keys():
+        return density.get(string)
+
+    nAtoms = formula.n_heavy + formula.n_h
+    nC = formula.atomdict.get('C') or 0
+    nH = formula.atomdict.get('H') or 0
+    nO = formula.atomdict.get('O') or 0
+    nN = formula.atomdict.get('N') or 0
+    nS = formula.atomdict.get('S') or 0
+    nF = formula.atomdict.get('F') or 0
+    nCl = formula.atomdict.get('Cl') or 0
+    nBr = formula.atomdict.get('Br') or 0
+    nI = formula.atomdict.get('I') or 0
+    nOther = nAtoms - nC - nH - nO - nN - nS - nF - nCl - nBr - nI
+    return (1.175 * nC + 0.572 * nH + 1.774 * nO + 1.133 * nN + 2.184 * nS
+            + 1.416 * nF + 2.199 * nCl + 5.558 * nBr + 7.460 * nI
+            + 0.911 * nOther) / nAtoms
+
+
+def random_res_name() -> str:
+    """Get the random residue name."""
+    return ''.join(random.choice(string.ascii_uppercase) for _ in range(3))
+
+
+def random_res_name_list(n: int) -> List[str]:
+    """ Get a list of random residue name.
+
+    Parameters
+    ----------
+    n
+
+    Returns
+    -------
+
+    """
+    res_name_list = []
+    while True:
+        res_name = random_res_name()
+        if res_name not in res_name_list:
+            res_name_list.append(res_name)
+        if len(res_name_list) == n:
+            return res_name_list

@@ -1,21 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import shutil
-from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
+from typing import List, Literal, Tuple
 from tap import Tap
 import os
-import numpy as np
 from rdkit import Chem
 import parmed as pmd
 from copy import deepcopy
 from rdkit.Chem import Descriptors
 from simutools.forcefields.amber import AMBER
-from simutools.simulator.gromacs.gromacs import GROMACS
-from simutools.simulator.plumed import PLUMED
-from simutools.coarse_grained.mapping import Mapping
+from simutools.simulator.program.gromacs import GROMACS
+from simutools.simulator.program.plumed import PLUMED
 from simutools.utils import cd_and_mkdir
 from simutools.template import TEMPLATE_DIR
-from simutools.utils import execute
 
 
 class CommonArgs(Tap):
@@ -72,9 +69,9 @@ class CommonArgs(Tap):
 
 def main(args: CommonArgs):
     cd_and_mkdir(args.save_dir)
-    gmx = GROMACS(gmx_exe_mdrun='gmx')
+    gmx = GROMACS(exe='gmx')
     amber = AMBER()
-    plumed = PLUMED(plumed_exe='plumed')
+    plumed = PLUMED(exe='plumed')
     # skip energy minimization if it is finished
     if not os.path.exists('em.gro'):
         if args.smiles is None:
@@ -90,13 +87,13 @@ def main(args: CommonArgs):
             ff.strip(f':SOL')
         else:
             amber.build(args.smiles[0], 'mol1', charge=args.charge[0], gromacs=True, tip3p=False,
-                        resName=args.res_name[0])
+                        res_name=args.res_name[0])
             gmx.fix_charge(f'mol1.top')
             ff = pmd.load_file(f'mol1.top', xyz=f'mol1.gro')
             nmol1 = len(ff.atoms)
             if not args.SameMol:
                 amber.build(args.smiles[1], 'mol2', charge=args.charge[1], gromacs=True, tip3p=False,
-                            resName=args.res_name[1])
+                            res_name=args.res_name[1])
                 gmx.fix_charge(f'mol2.top')
                 ff2 = pmd.load_file(f'mol2.top', xyz=f'mol2.gro')
             else:

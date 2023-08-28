@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 import os.path
 import shutil
-from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
+from typing import List
 from tap import Tap
 import MDAnalysis as mda
 from simutools.utils import cd_and_mkdir
-from simutools.builder.packmol import Packmol
-from simutools.simulator.gromacs.gromacs import GROMACS
-from simutools.simulator.plumed import PLUMED
+from simutools.simulator.program.packmol import Packmol
+from simutools.simulator.program.gromacs import GROMACS
+from simutools.simulator.program.plumed import PLUMED
 from simutools.template import TEMPLATE_DIR
 
 
@@ -82,7 +82,7 @@ def main(args: CommonArgs):
                     assert len(universe.residues) == 1
                     pdb_files.append(pdb)
                 if args.centripedal is not None:
-                    plumed = PLUMED(plumed_exe='plumed')
+                    plumed = PLUMED(exe='plumed')
                     n_beads = [len(mda.Universe(pdb).atoms) for pdb in pdb_files]
                     groups = []
                     n_current = 1
@@ -97,7 +97,7 @@ def main(args: CommonArgs):
                 packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
                                   tolerance=6.0)
                 pdb2gro('bulk.pdb', 'bulk.gro', [x * 10 for x in args.box_size] + [90., 90., 90.])
-            gmx = GROMACS(gmx_exe_mdrun='gmx')
+            gmx = GROMACS(exe='gmx')
             itp_list = []
             for itp in args.itp_list:
                 shutil.copy('../%s' % itp, '.')

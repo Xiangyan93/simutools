@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import shutil
-from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
+from typing import List, Literal
 from tap import Tap
 import os
 import numpy as np
 from rdkit import Chem
 from simutools.forcefields.amber import AMBER
-from simutools.simulator.gromacs.gromacs import GROMACS
+from simutools.simulator.program.gromacs import GROMACS
 from simutools.coarse_grained.mapping import Mapping
 from simutools.utils import cd_and_mkdir
 from simutools.template import TEMPLATE_DIR
@@ -48,13 +48,13 @@ class CommonArgs(Tap):
 
 def main(args: CommonArgs):
     cd_and_mkdir(args.save_dir)
-    gmx = GROMACS(gmx_exe_mdrun='gmx')
+    gmx = GROMACS(exe='gmx')
     if args.action == 'all-atom':
         assert args.smiles is not None
         cd_and_mkdir('1.all-atom')
         if not os.path.exists('run.gro'):
             amber = AMBER()
-            amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, resName=args.res_name)
+            amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, res_name=args.res_name)
 
             gmx.fix_charge(f'{args.name}.top')
             gmx.insert_molecules(f'{args.name}.gro', outgro='output.gro')
