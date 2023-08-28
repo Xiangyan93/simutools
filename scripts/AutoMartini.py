@@ -9,9 +9,8 @@ from rdkit import Chem
 from simutools.forcefields.amber import AMBER
 from simutools.simulator.program.gromacs import GROMACS
 from simutools.coarse_grained.mapping import Mapping
-from simutools.utils import cd_and_mkdir
 from simutools.template import TEMPLATE_DIR
-from simutools.utils import execute
+from simutools.utils.utils import execute, cd_and_mkdir
 
 
 class CommonArgs(Tap):
@@ -53,11 +52,12 @@ def main(args: CommonArgs):
         assert args.smiles is not None
         cd_and_mkdir('1.all-atom')
         if not os.path.exists('run.gro'):
-            amber = AMBER()
-            amber.build(args.smiles, args.name, charge=args.charge, gromacs=True, tip3p=True, res_name=args.res_name)
-
+            amber = AMBER(exe='antechamber')
+            amber.checkout(smiles_list=[args.smiles], n_mol_list=[1],
+                           name_list=[args.name], res_name_list=[args.res_name], simulator=gmx)
+            shutil.copy('checkout.top', f'{args.name}.top')
             gmx.fix_charge(f'{args.name}.top')
-            gmx.insert_molecules(f'{args.name}.gro', outgro='output.gro')
+            gmx.insert_molecules(f'checkout.gro', outgro='output.gro')
             gmx.solvate('output.gro', top=f'{args.name}.top', outgro='initial.gro')
 
             gmx.generate_mdp_from_template('t_em.mdp', mdp_out=f'em.mdp', dielectric=1.0)
@@ -102,16 +102,16 @@ def main(args: CommonArgs):
                          mol_name=[args.res_name], mol_number=[1])
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=100000, dt=0.005,
-                                       tcoupl='v-rescale', tau_t='0.1',
-                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       tcoupl='v-rescale', tau_t=0.1,
+                                       pcoupl='berendsen', tau_p=12.0, compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff',
-                                       rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+                                       rcoulomb=1.1, rvdw=1.1, dielectric=15, nstlist=20)
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=1000000, dt=0.005, nstxtcout=10,
                                        restart=True,
-                                       tcoupl='v-rescale', tau_t='0.1',
-                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                       constraints='none', coulombtype='reaction-field', rcoulomb='1.1',
-                                       rvdw='1.1', dielectric=15, nstlist=20)
+                                       tcoupl='v-rescale', tau_t=0.1,
+                                       pcoupl='parrinello-rahman', tau_p=12.0, compressibility='3e-4',
+                                       constraints='none', coulombtype='reaction-field', rcoulomb=1.1,
+                                       rvdw=1.1, dielectric=15, nstlist=20)
         gmx.solvate(f'CG_{args.name}.gro', top=f'CG_{args.name}.top', outgro='CG_initial.gro',
                     solvent=f'{TEMPLATE_DIR}/box_martini3_water.gro')
         emds = []
@@ -154,16 +154,16 @@ def main(args: CommonArgs):
         cd_and_mkdir('4.stability')
         gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=1.0)
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=100000, dt=0.005,
-                                       tcoupl='v-rescale', tau_t='0.1',
-                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       tcoupl='v-rescale', tau_t=0.1,
+                                       pcoupl='berendsen', tau_p=12.0, compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff',
-                                       rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+                                       rcoulomb=1.1, rvdw=1.1, dielectric=15, nstlist=20)
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=10000000, dt=0.01, nstxtcout=20,
                                        restart=True,
-                                       tcoupl='v-rescale', tau_t='0.1',
-                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                       constraints='none', coulombtype='cutoff', rcoulomb='1.1',
-                                       rvdw='1.1', dielectric=15, nstlist=20)
+                                       tcoupl='v-rescale', tau_t=0.1,
+                                       pcoupl='parrinello-rahman', tau_p=12.0, compressibility='3e-4',
+                                       constraints='none', coulombtype='cutoff', rcoulomb=1.1,
+                                       rvdw=1.1, dielectric=15, nstlist=20)
         shutil.copy(f'../CG_{args.name}.itp', '.')
         shutil.copy(f'../CG_{args.name}.top', '.')
         shutil.copy(f'../CG_{args.name}.gro', '.')
@@ -206,18 +206,18 @@ def main(args: CommonArgs):
         gmx.mdrun(tpr='CG_em.tpr')
         # use a small timestep when equilibrium, otherwise LINCS error.
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=200000, dt=0.02,
-                                       tcoupl='v-rescale', tau_t='1.0',
-                                       pcoupl='berendsen', tau_p='12.0', compressibility='3e-4',
+                                       tcoupl='v-rescale', tau_t=1.0,
+                                       pcoupl='berendsen', tau_p=12.0, compressibility='3e-4',
                                        constraints='none', coulombtype='cutoff',
-                                       rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+                                       rcoulomb=1.1, rvdw=1.1, dielectric=15, nstlist=20)
         gmx.grompp(gro='CG_em.gro', mdp='CG_eq.mdp', top=f'CG_{args.name}.top', tpr='CG_eq.tpr')
         gmx.mdrun(tpr='CG_eq.tpr')
         gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=1000000, dt=0.02, nstxtcout=10,
                                        restart=True,
-                                       tcoupl='v-rescale', tau_t='1.0',
-                                       pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                       constraints='none', coulombtype='cutoff', rcoulomb='1.1',
-                                       rvdw='1.1', dielectric=15, nstlist=20)
+                                       tcoupl='v-rescale', tau_t=1.0,
+                                       pcoupl='parrinello-rahman', tau_p=12.0, compressibility='3e-4',
+                                       constraints='none', coulombtype='cutoff', rcoulomb=1.1,
+                                       rvdw=1.1, dielectric=15, nstlist=20)
         gmx.grompp(gro='CG_eq.gro', mdp='CG_run.mdp', top=f'CG_{args.name}.top', tpr='CG_run.tpr')
         gmx.mdrun(tpr='CG_run.tpr')
         gmx.trjconv(gro='CG_run.xtc', out_gro='CG_run_pbc.xtc', tpr='CG_run.tpr', pbc_whole=True)

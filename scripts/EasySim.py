@@ -5,7 +5,7 @@ import shutil
 from typing import List
 from tap import Tap
 import MDAnalysis as mda
-from simutools.utils import cd_and_mkdir
+from simutools.utils.utils import cd_and_mkdir
 from simutools.simulator.program.packmol import Packmol
 from simutools.simulator.program.gromacs import GROMACS
 from simutools.simulator.program.plumed import PLUMED
@@ -61,7 +61,7 @@ class CommonArgs(Tap):
 
     def process_args(self) -> None:
         assert len(self.box_size) == 3
-        valid_index= []
+        valid_index = []
         for i, n in enumerate(self.n_mol_list):
             if n != 0:
                 valid_index.append(i)
@@ -94,8 +94,8 @@ def main(args: CommonArgs):
                             n_current += n_beads[i]
                     plumed.generate_dat_centripedal(groups=groups, k=args.centripedal)
                 packmol = Packmol('packmol')
-                packmol.build_box(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb', box_size=args.box_size,
-                                  tolerance=6.0)
+                packmol.build_uniform(pdb_files=pdb_files, n_mol_list=args.n_mol_list, output='bulk.pdb',
+                                      box_size=args.box_size, tolerance=6.0)
                 pdb2gro('bulk.pdb', 'bulk.gro', [x * 10 for x in args.box_size] + [90., 90., 90.])
             gmx = GROMACS(exe='gmx')
             itp_list = []
@@ -110,31 +110,31 @@ def main(args: CommonArgs):
             if args.PME:
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=5000000, dt=0.005,
                                                nstxtcout=10000,
-                                               tcoupl='v-rescale', tau_t='1.0',
-                                               pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
+                                               tcoupl='v-rescale', tau_t=1.0,
+                                               pcoupl='berendsen', tau_p=1.0, compressibility='3e-4',
                                                constraints='none', coulombtype='PME',
-                                               rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+                                               rcoulomb=1.1, rvdw=1.1, dielectric=15, nstlist=20)
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005,
                                                nstxtcout=10000,
                                                restart=True,
-                                               tcoupl='v-rescale', tau_t='1.0',
-                                               pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                               constraints='none', coulombtype='PME', rcoulomb='1.1',
-                                               rvdw='1.1', dielectric=15, nstlist=20)
+                                               tcoupl='v-rescale', tau_t=1.0,
+                                               pcoupl='parrinello-rahman', tau_p=12.0, compressibility='3e-4',
+                                               constraints='none', coulombtype='PME', rcoulomb=1.1,
+                                               rvdw=1.1, dielectric=15, nstlist=20)
             else:
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_eq.mdp', nsteps=500000, dt=0.005,
                                                nstxtcout=10000,
-                                               tcoupl='v-rescale', tau_t='1.0',
-                                               pcoupl='berendsen', tau_p='1.0', compressibility='3e-4',
+                                               tcoupl='v-rescale', tau_t=1.0,
+                                               pcoupl='berendsen', tau_p=1.0, compressibility='3e-4',
                                                constraints='none', coulombtype='reaction-field',
-                                               rcoulomb='1.1', rvdw='1.1', dielectric=15, nstlist=20)
+                                               rcoulomb=1.1, rvdw=1.1, dielectric=15, nstlist=20)
                 gmx.generate_mdp_from_template('t_npt.mdp', mdp_out=f'CG_run.mdp', nsteps=5000000, dt=0.005,
                                                nstxtcout=10000,
                                                restart=True,
-                                               tcoupl='v-rescale', tau_t='1.0',
-                                               pcoupl='parrinello-rahman', tau_p='12.0', compressibility='3e-4',
-                                               constraints='none', coulombtype='reaction-field', rcoulomb='1.1',
-                                               rvdw='1.1', dielectric=15, nstlist=20)
+                                               tcoupl='v-rescale', tau_t=1.0,
+                                               pcoupl='parrinello-rahman', tau_p=12.0, compressibility='3e-4',
+                                               constraints='none', coulombtype='reaction-field', rcoulomb=1.1,
+                                               rvdw=1.1, dielectric=15, nstlist=20)
             if not os.path.exists('CG_em.gro'):
                 gmx.grompp(gro='bulk.gro', mdp='CG_em.mdp', top=f'CG.top', tpr=f'CG_em.tpr')
                 gmx.mdrun(tpr=f'CG_em.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
@@ -145,7 +145,7 @@ def main(args: CommonArgs):
                 gmx.mdrun(tpr=f'CG_eq.tpr', ntmpi=args.ntmpi, ntomp=args.ntomp)
             for i in range(args.n_runs):
                 if not os.path.exists(f'CG_run_{i}.gro'):
-                    gro = 'CG_eq.gro' if i == 0 else f'CG_run_{i-1}.gro'
+                    gro = 'CG_eq.gro' if i == 0 else f'CG_run_{i - 1}.gro'
                     gmx.grompp(gro=gro, mdp='CG_run.mdp', top=f'CG.top', tpr=f'CG_run_{i}.tpr',
                                maxwarn=1)
                     if args.centripedal is not None and i == 0:
