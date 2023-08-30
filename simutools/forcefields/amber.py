@@ -115,7 +115,7 @@ class AMBER(BaseForceField):
             # output PDB file with correct residue name.
             with open(f'{name}_ob.pdb', 'r') as input_file, open(f'{name}.pdb', 'w') as output_file:
                 for line in input_file:
-                    modified_line = re.sub(r'UNL', 'ABC', line)
+                    modified_line = re.sub(r'UNL', res_name, line)
                     output_file.write(modified_line)
 
     @property
