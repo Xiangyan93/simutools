@@ -83,7 +83,8 @@ class Slurm:
         if path is None:
             path = os.getcwd()
         # n_mpi, srun_commands = self._replace_mpirun_srun(commands)
-
+        if sh_index:
+            name = name + '-%i' % self._get_local_index_of_job(path=path, name=name)
         info = '#!/bin/bash\n'
         info += '#SBATCH -D %s\n' % path
         info += '#SBATCH -N %s\n' % nnodes
@@ -112,8 +113,6 @@ class Slurm:
         if save_running_time:
             info += '\necho $(date) >> %s.time' % name
 
-        if sh_index:
-            name = name + '-%i' % self._get_local_index_of_job(path=path, name=name)
         filename = os.path.join(path, name + '.sh')
         file = open(filename, 'w')
         file.write(info)
