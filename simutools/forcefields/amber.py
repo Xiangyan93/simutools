@@ -28,7 +28,7 @@ class AMBER(BaseForceField):
         print(f'{self.exe} is valid.')
 
     def checkout(self, smiles_list: List[str], n_mol_list: List[int], name_list: List[str],
-                 res_name_list: List[str], simulator: BaseMDProgram):
+                 res_name_list: List[str], simulator: BaseMDProgram, outname: str = 'checkout'):
         """ Checkout AMBER force field for a list of molecules.
 
         Parameters
@@ -38,6 +38,7 @@ class AMBER(BaseForceField):
         name_list: the name of molecules.
         res_name_list: the residue name of molecules.
         simulator: determine the format of output force field files.
+        outname: output name of gro and top files.
 
         Returns
         -------
@@ -52,10 +53,10 @@ class AMBER(BaseForceField):
             else:
                 ff += pmd.load_file(f'{name}.prmtop', f'{name}.inpcrd')
         if isinstance(simulator, GROMACS):
-            ff.save('checkout.gro', overwrite=True)
-            ff.save('checkout.top', overwrite=True)
+            ff.save(f'{outname}.gro', overwrite=True)
+            ff.save(f'{outname}.top', overwrite=True)
             for i, smiles in enumerate(smiles_list):
-                simulator.modify_top_mol_numbers(top='checkout.top', outtop='checkout.top',
+                simulator.modify_top_mol_numbers(top=f'{outname}.top', outtop=f'{outname}.top',
                                                  mol_name=res_name_list[i], n_mol=n_mol_list[i])
         else:
             raise ValueError('Only GROMACS is valid now.')
