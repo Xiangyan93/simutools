@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 from typing import List
 import os
+import re
 import shutil
 import parmed as pmd
-from openbabel import pybel
 from simutools.template import TEMPLATE_DIR
 from simutools.simulator.mol3d import Mol3D
 from simutools.simulator.program import *
@@ -111,9 +111,11 @@ class AMBER(BaseForceField):
             print(f'Building AMBER files for molecule {smiles}')
             for cmd in cmds:
                 execute(cmd)
-            # convert mol2 into pdb
-            mol = next(pybel.readfile("mol2", f'{name}.mol2'))
-            mol.write('pdb', f'{name}.pdb')
+            # output PDB file with correct residue name.
+            with open(f'{name}_ob.pdb', 'r') as input_file, open(f'{name}.pdb', 'w') as output_file:
+                for line in input_file:
+                    modified_line = re.sub(r'UNL', 'ABC', line)
+                    output_file.write(modified_line)
 
     @property
     def cache_molecules(self):

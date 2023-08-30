@@ -95,7 +95,7 @@ class Slurm:
             info += '#SBATCH --mem=%dG\n' % memory
         if ntasks is not None:
             info += '#SBATCH --ntasks=%i\n' % ntasks
-        if n_gpu != 0:
+        if n_gpu is not None and n_gpu != 0:
             info += '#SBATCH --gres=gpu:%i\n' % n_gpu
         if exclude is not None:
             info += '#SBATCH --exclude=%s\n' % exclude

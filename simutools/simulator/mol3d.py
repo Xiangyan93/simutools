@@ -69,7 +69,6 @@ class Mol3D:
         mol.addh()
         # make 3D
         mol.make3D()
-        openbabel.O
         if minimize:
             mol.localopt()
             # charge method
@@ -82,8 +81,8 @@ class Mol3D:
             ff = openbabel.OBForceField.FindForceField(force_field)
             ff.Setup(mol.OBMol)
             #  systematic rotor search for lowest energy conformer
-            ff.SystematicRotorSearch(N_search)
-            # ff.WeightedRotorSearch(100, 100)
+            # ff.SystematicRotorSearch(N_search) # Very slow for large molecules.
+            ff.WeightedRotorSearch(100, 100)
         return mol
 
     def conformers_optimize(self, n_select: int = 10, n_try: int = 10) -> List[pybel.Molecule]:
