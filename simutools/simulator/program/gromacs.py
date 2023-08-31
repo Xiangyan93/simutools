@@ -203,7 +203,7 @@ class GROMACS(BaseMDProgram):
         """
         with open(top) as f:
             contents = f.read()
-            pattern = rf'\b{mol_name}\s+\d+\b'
+            pattern = rf'\n{mol_name}\s+\d+\n'
             search_info = re.findall(pattern, contents)
             if len(search_info) == 0:
                 contents += f'{mol_name}\t\t\t\t\t {n_mol}'
@@ -211,7 +211,7 @@ class GROMACS(BaseMDProgram):
                 # pattern = re.compile(pattern)
                 # contents = pattern.sub(f'{mol_name}\t\t\t\t\t {n_mol}', contents)
                 # replace the last occurance of pattern.
-                contents = re.sub(rf'({pattern})(?!.*{pattern})', f'{mol_name}\t\t\t\t\t {n_mol}',
+                contents = re.sub(rf'({pattern})(?!.*{pattern})', f'\n{mol_name}\t\t\t\t\t {n_mol}\n',
                                   contents, count=1, flags=re.DOTALL)
             else:
                 raise ValueError()
