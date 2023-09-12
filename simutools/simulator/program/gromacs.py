@@ -374,7 +374,7 @@ class GROMACS(BaseMDProgram):
         """
         if outtpr is None:
             outtpr = tpr
-        cmd = '%s -quiet convert-tpr -s %s -o %s' % (self.gmx_analysis, tpr, outtpr)
+        cmd = '%s -quiet -nobackup convert-tpr -s %s -o %s' % (self.gmx_analysis, tpr, outtpr)
         if extend is not None:
             cmd += f' -extend {extend}'
         if until is not None:
