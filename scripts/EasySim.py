@@ -5,7 +5,6 @@ import shutil
 from typing import List
 from tap import Tap
 import MDAnalysis as mda
-from simutools.utils.utils import cd_and_mkdir
 from simutools.simulator.program.packmol import Packmol
 from simutools.simulator.program.gromacs import GROMACS
 from simutools.simulator.program.plumed import PLUMED
@@ -71,7 +70,8 @@ class CommonArgs(Tap):
 
 
 def main(args: CommonArgs):
-    cd_and_mkdir(args.save_dir)
+    os.makedirs(args.save_dir)
+    os.chdir(args.save_dir)
     for i in range(args.n_try):
         try:
             if not os.path.exists('bulk.gro'):

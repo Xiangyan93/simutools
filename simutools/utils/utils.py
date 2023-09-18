@@ -29,36 +29,6 @@ def execute(cmd: str, input: str = None):
     return cmd_process.communicate()
 
 
-def cd_and_mkdir(path: str):
-    create_folder(path)
-    os.chdir(path)
-
-
-def create_missing_folders(path: str):
-    # Split the given path into individual folder names
-    folders = path.split(os.path.sep)
-    if not folders[0]:
-        folders[0] = '/'
-    # Initialize an empty string to build the new path
-    current_path = ""
-
-    # Iterate through each folder and create if it doesn't exist
-    for folder in folders:
-        # Build the current subpath
-        current_path = os.path.join(current_path, folder)
-
-        # Check if the current subpath exists as a directory
-        if not os.path.exists(current_path):
-            # Create the directory
-            os.mkdir(current_path)
-            print(f"Created directory: {current_path}")
-
-
-def create_folder(path: str):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
 def all_same(items, tol=1e-6):
     """
     Returns True if all the items in the list are the same up to the given tolerance level, otherwise False.

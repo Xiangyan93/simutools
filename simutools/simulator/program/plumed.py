@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import os
-import re
-from MDAnalysis.topology.ITPParser import ITPParser
-import numpy as np
+from typing import List, Literal
 import pandas as pd
-from simutools.utils.utils import execute, cd_and_mkdir, find_index_of_max_unique_abs
 from simutools.template import TEMPLATE_DIR
+from simutools.utils.utils import execute
 
 
 class PLUMED:

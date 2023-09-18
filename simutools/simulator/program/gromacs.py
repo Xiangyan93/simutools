@@ -7,7 +7,7 @@ import numpy as np
 import MDAnalysis as mda
 from MDAnalysis.topology.ITPParser import ITPParser
 import parmed as pmd
-from simutools.utils.utils import execute, cd_and_mkdir, find_index_of_max_unique_abs
+from simutools.utils.utils import execute, find_index_of_max_unique_abs
 from simutools.template import TEMPLATE_DIR
 from .base import BaseMDProgram
 
