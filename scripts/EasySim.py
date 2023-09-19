@@ -70,8 +70,9 @@ class CommonArgs(Tap):
 
 
 def main(args: CommonArgs):
-    os.makedirs(args.save_dir)
-    os.chdir(args.save_dir)
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
+        os.chdir(args.save_dir)
     for i in range(args.n_try):
         try:
             if not os.path.exists('bulk.gro'):
