@@ -103,9 +103,9 @@ def main(args: CommonArgs):
             for itp in args.itp_list:
                 shutil.copy('../%s' % itp, '.')
                 itp_list.append(itp.split('/')[-1])
-            gmx.generate_top(f'CG.top', include_itps=[f'{TEMPLATE_DIR}/martini_v3.0.0.itp',
-                                                      f'{TEMPLATE_DIR}/martini_v3.0.0_solvents_v1.itp',
-                                                      f'{TEMPLATE_DIR}/martini_v3.0.0_ions_v1.itp'] + itp_list,
+            gmx.generate_top(f'CG.top', include_itps=[f'{TEMPLATE_DIR}/gromacs/martini_v3.0.0.itp',
+                                                      f'{TEMPLATE_DIR}/gromacs/martini_v3.0.0_solvents_v1.itp',
+                                                      f'{TEMPLATE_DIR}/gromacs/martini_v3.0.0_ions_v1.itp'] + itp_list,
                              mol_name=args.mol_name, mol_number=args.n_mol_list)
             gmx.generate_mdp_from_template('t_CG_em.mdp', mdp_out=f'CG_em.mdp', dielectric=15.0)
             if args.PME:

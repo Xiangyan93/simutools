@@ -107,24 +107,24 @@ class GROMACS(BaseMDProgram):
         if tcoupl.lower() == 'langevin':
             integrator = 'sd'
             tcoupl = 'no'
-            tau_t = str(0.001 / dt) if tau_t is None else tau_t  # inverse friction coefficient
+            tau_t = str(0.001 / dt) if tau_t is None else str(tau_t)  # inverse friction coefficient
         elif tcoupl.lower() == 'nose-hoover':
             integrator = 'md'
             tcoupl = 'nose-hoover'
-            tau_t = '0.5' if tau_t is None else tau_t
+            tau_t = '0.5' if tau_t is None else str(tau_t)
         elif tcoupl.lower() == 'v-rescale':
             integrator = 'md'
             tcoupl = 'v-rescale'
-            tau_t = '0.1' if tau_t is None else tau_t
+            tau_t = '0.1' if tau_t is None else str(tau_t)
         else:
             raise Exception('Invalid tcoupl, should be one of langvein, nose-hoover, v-rescale')
 
         if pcoupl.lower() == 'berendsen':
-            tau_p = '1' if tau_p is None else tau_p
+            tau_p = '1' if tau_p is None else str(tau_p)
         elif pcoupl.lower() == 'parrinello-rahman':
-            tau_p = '5' if tau_p is None else tau_p
+            tau_p = '5' if tau_p is None else str(tau_p)
         elif pcoupl.lower() == 'mttk':
-            tau_p = '5' if tau_p is None else tau_p
+            tau_p = '5' if tau_p is None else str(tau_p)
             constraints = 'none'
         else:
             raise Exception('Invalid pcoupl, should be one of berendsen, parrinello-rahman, mttk')
