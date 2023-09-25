@@ -37,3 +37,22 @@ gen-seed        = %seed%
 constraints      = %constraints%; h-bonds
 constraint-algorithm = lincs
 continuation     = %continuation%
+
+; and set the free energy parameters
+free-energy              = yes
+couple-moltype           = %couple_moltype%
+nstdhdl                  = 50 ; frequency for writing energy difference in dhdl.xvg, 0 means no ouput, should be a multiple of nstcalcenergy.
+; these 'soft-core' parameters make sure we never get overlapping
+; charges as lambda goes to 0
+; soft-core function
+sc-power                 = 1
+sc-sigma                 = 0.3
+sc-alpha                 = 1.0
+; we still want the molecule to interact with itself at lambda=0
+couple-intramol          = no
+couple-lambda1           = vdwq
+couple-lambda0           = none
+init-lambda-state        = %init_lambda_state%
+; These are the lambda states at which we simulate
+; for separate LJ and Coulomb decoupling, use
+fep-lambdas              = %fep_lambdas%; 0.0 0.2 0.4 0.6 0.8 0.9 1.0

@@ -88,7 +88,31 @@ class GROMACS(BaseMDProgram):
             f.write(contents)
         return contents
 
-    def generate_mdp_from_template(
+    def generate_mdp_from_template(self, template: str, mdp_out: str = 'grompp.mdp', **kwargs):
+        """generate mdp file for GROMACS simulation"""
+
+        template = f'{self.tmp_dir}/{template}'
+        if not os.path.exists(template):
+            raise ValueError(f'mdp template not found: {template}')
+
+        with open(template) as f_t:
+            contents = f_t.read()
+        for key, value in kwargs.items():
+            contents = contents.replace(f'%{key}%', str(value))
+
+        pattern = r'%([^%]+)%'
+        for match in re.findall(pattern, contents):
+            if match == 'nstlist':
+                contents = contents.replace(f'%{match}%', str(max(1, int(0.01 / kwargs['dt']))))
+            elif match == 'tau_t':
+                contents = contents.replace(f'%{match}%', str(0.001 / kwargs['dt']))
+            else:
+                raise ValueError(f'Invalid parameter: {match}')
+
+        with open(mdp_out, 'w') as f_mdp:
+            f_mdp.write(contents)
+
+    def generate_mdp_from_template_(
             self, template: str, mdp_out: str = 'grompp.mdp', T: float = 298., P: float = 1.,
             nsteps: int = 10000, dt: float = 0.001, T_annealing: float = 800.,
             nstenergy: int = 100, nstxout: int = 0, nstvout: int = 0, nstxtcout: int = 10000,
@@ -99,7 +123,8 @@ class GROMACS(BaseMDProgram):
             rvdw: float = 1.2,
             constraints: str = 'h-bonds', ppm=0,
             nstlist=None):
-        """generate mdp file for GROMACS simulation."""
+        """generate mdp file for GROMACS simulation"""
+
         template = f'{self.tmp_dir}/{template}'
         if not os.path.exists(template):
             raise ValueError(f'mdp template not found: {template}')
