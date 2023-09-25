@@ -563,3 +563,11 @@ class GROMACS(BaseMDProgram):
         if pbc_whole:
             cmd += ' -pbc whole'
         execute(cmd, input=f'{select}')
+
+    def bar(self, xvgs: List[str], begin: float = None):
+        for xvg in xvgs:
+            assert os.path.exists(xvg), f'{xvg} not exists.'
+        cmd = f'{self.gmx_analysis} -quiet -nobackup bar -f {" ".join(xvgs)}'
+        if begin is not None:
+            cmd += f' -b {begin}'
+        return execute(cmd)
