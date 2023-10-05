@@ -10,8 +10,9 @@ nstxout-compressed = %nstxtcout%
 compressed-x-grps  = %xtcgrps%
 
 cutoff-scheme   = verlet
+verlet-buffer-tolerance = -1
 nstlist         = %nstlist%
-
+rlist           = %rlist%
 coulombtype     = %coulombtype%
 rcoulomb        = %rcoulomb%; 1.2
 epsilon-r       = %dielectric%
@@ -49,10 +50,12 @@ sc-power                 = 1
 sc-sigma                 = 0.3
 sc-alpha                 = 1.0
 ; we still want the molecule to interact with itself at lambda=0
-couple-intramol          = yes
+couple-intramol          = no
 couple-lambda1           = vdwq
 couple-lambda0           = none
 init-lambda-state        = %init_lambda_state%
 ; These are the lambda states at which we simulate
 ; for separate LJ and Coulomb decoupling, use
-fep-lambdas              = %fep_lambdas%; 0.0 0.2 0.4 0.6 0.8 0.9 1.0
+vdw-lambdas = 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0
+coul-lambdas = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+; fep-lambdas              = %fep_lambdas%; 0.0 0.2 0.4 0.6 0.8 0.9 1.0
