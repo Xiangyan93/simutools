@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from typing import List
+from typing import List, Literal
 import os
 import re
 import shutil
@@ -14,8 +14,9 @@ from .base import BaseForceField
 
 
 class AMBER(BaseForceField):
-    def __init__(self, exe: str):
+    def __init__(self, exe: str, force_field: Literal['gaff', 'gaff2'] = 'gaff2'):
         self.exe = exe
+        self.force_field = force_field
         self.prefix = exe.replace('antechamber', '')
         self.check_version()
         self.tmp_dir = f'{TEMPLATE_DIR}/amber'
@@ -104,9 +105,9 @@ class AMBER(BaseForceField):
             cmds = []
             if not os.path.exists(f'{name}.mol2'):
                 cmds.append(f'{self.exe} -i {name}_ob.mol2 -fi mol2 -o {name}.mol2 -rn {res_name} -fo mol2 -s 1 '
-                            f'-nc {charge} -at gaff2 -dr no')
+                            f'-nc {charge} -at {self.force_field} -dr no')
             cmds += [
-                f'{self.prefix}parmchk2 -i {name}.mol2 -f mol2 -o {name}.frcmod -s gaff2 -a Y',
+                f'{self.prefix}parmchk2 -i {name}.mol2 -f mol2 -o {name}.frcmod -s {self.force_field} -a Y',
                 f'{self.prefix}tleap -f tleap.in'
             ]
             print(f'Building AMBER files for molecule {smiles}')
