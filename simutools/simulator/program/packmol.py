@@ -43,6 +43,8 @@ class Packmol(BaseProgram):
         """
         assert len(pdb_files) > 0
         assert len(pdb_files) == len(n_mol_list)
+        for pdb_file in pdb_files:
+            assert len(pdb_file) < 80, 'The length of PDB file name must be less than 80.'
         box_size = [v * 10 for v in box_size]  # nm to A, input unit is nm, but packmol need A.
 
         inp = (
