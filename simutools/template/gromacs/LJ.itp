@@ -1,0 +1,40 @@
+
+[ defaults ]
+1 2 ; sigma-epsilon format of LJ parameters
+
+[ atomtypes ]
+P1 500.0 0.000 A 0.0 0.0 ; drug
+P2 500.0 0.000 A 0.0 0.0 ; excp
+P3 500.0 0.000 A 0.0 0.0 ; water
+
+[ nonbond_params ]
+P1    P1  1 1.0 5.0
+P1    P2  1 1.0 3.0
+P1    P3  1 1.0 1.0
+P2    P2  1 1.0 1.0
+P2    P3  1 1.0 5.0
+P3    P3  1 1.0 5.0
+
+[ moleculetype ]
+; molname  	nrexcl
+  P1  	    	1
+
+[ atoms ]
+;id     type    resnr   residu  atom    cgnr    charge
+ 1      P1     1        P1      P1     1       0
+
+[ moleculetype ]
+; molname  	nrexcl
+  P2  	    	1
+
+[ atoms ]
+;id     type    resnr   residu  atom    cgnr    charge
+ 1      P2     1        P2      P2     1       0
+
+ [ moleculetype ]
+; molname  	nrexcl
+  P3  	    	1
+
+[ atoms ]
+;id     type    resnr   residu  atom    cgnr    charge
+ 1      P3     1        P3      P3     1       0

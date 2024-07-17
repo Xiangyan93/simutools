@@ -1,0 +1,11 @@
+integrator      = steep
+emtol           = 200
+nsteps          = -1
+
+cutoff-scheme   = verlet
+
+coulombtype     = cut-off
+epsilon-r       = %dielectric%
+
+rcoulomb        = 1.1
+rvdw            = 1.1

@@ -1,0 +1,61 @@
+integrator      = %integrator%; sd; md
+dt              = %dt%; 0.002; 0.001
+nsteps          = %nsteps%
+
+nstcalcenergy      = -1
+nstenergy          = %nstenergy%
+nstxout            = %nstxout%
+nstvout            = %nstvout%
+nstxout-compressed = %nstxtcout%
+compressed-x-grps  = %xtcgrps%
+
+cutoff-scheme   = verlet
+verlet-buffer-tolerance = -1
+nstlist         = %nstlist%
+rlist           = %rlist%
+coulombtype     = %coulombtype%
+rcoulomb        = %rcoulomb%; 1.2
+epsilon-r       = %dielectric%
+
+rvdw            = %rvdw%; 1.2
+DispCorr        = EnerPres
+
+tcoupl          = %tcoupl%; no; nose-hoover
+tc-grps         = System
+tau-t           = %tau_t%; 0.5; 0.5
+ref-t           = %T%
+
+pcoupl          = %pcoupl%; parrinello-rahman; berendsen
+pcoupltype      = isotropic
+tau-p           = %tau_p%; 5; 1
+compressibility = %compressibility%; 4.5e-5
+ref-p           = %P%
+
+gen-vel         = %genvel%
+gen-temp        = %T%
+gen-seed        = %seed%
+
+constraints      = %constraints%; h-bonds
+constraint-algorithm = lincs
+continuation     = %continuation%
+
+; and set the free energy parameters
+free-energy              = yes
+couple-moltype           = %couple_moltype%
+nstdhdl                  = 50 ; frequency for writing energy difference in dhdl.xvg, 0 means no ouput, should be a multiple of nstcalcenergy.
+; these 'soft-core' parameters make sure we never get overlapping
+; charges as lambda goes to 0
+; soft-core function
+sc-power                 = 1
+sc-sigma                 = 0.3
+sc-alpha                 = 1.0
+; we still want the molecule to interact with itself at lambda=0
+couple-intramol          = no
+couple-lambda1           = vdwq
+couple-lambda0           = none
+init-lambda-state        = %init_lambda_state%
+; These are the lambda states at which we simulate
+; for separate LJ and Coulomb decoupling, use
+vdw-lambdas = 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0
+coul-lambdas = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+; fep-lambdas              = %fep_lambdas%; 0.0 0.2 0.4 0.6 0.8 0.9 1.0
