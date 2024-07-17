@@ -90,7 +90,8 @@ class Slurm:
 
     def generate_sh(self, name: str, commands: List[str], path: str = None, qos: str = None,
                     partition: str = 'cpu', nnodes: int = 1, ntasks: int = 1, n_gpu: int = None, gpu: str = None,
-                    memory: int = None, walltime: int = 48, exclusive: bool = False, exclude: str = None,
+                    memory: int = None, walltime: int = 48, exclusive: bool = False, 
+                    nodelist: str = None, exclude: str = None,
                     save_running_time: bool = False, sh_index: bool = False) -> str:
         """
         Generate a slurm script: <name>.sh.
@@ -108,6 +109,7 @@ class Slurm:
             memory (int, optional): Allocated memory in GB.
             walltime (int, default=48): Wall time in hours.
             exclusive (bool, default=False): Exclusive node usage.
+            nodelist (str, optional): Nodes to submit.
             exclude (str, optional): Nodes to exclude.
             save_running_time (bool, default=False): Save job runtime information.
             sh_index (bool, default=False): Append index to script filename.
@@ -135,10 +137,12 @@ class Slurm:
                 info += '#SBATCH --gres=gpu:%s:%i\n' % (gpu, n_gpu)
             else:
                 info += '#SBATCH --gres=gpu:%i\n' % n_gpu
-        if exclude is not None:
-            info += '#SBATCH --exclude=%s\n' % exclude
         if exclusive:
             info += '#SBATCH --exclusive\n'
+        if nodelist is not None:
+            info += '#SBATCH --nodelist=%s\n' % exclude
+        if exclude is not None:
+            info += '#SBATCH --exclude=%s\n' % exclude
         if qos is not None:
             info += '#SBATCH --qos=%s\n' % qos
         info += '#SBATCH --time=%i:0:0\n' % walltime
