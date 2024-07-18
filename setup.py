@@ -40,5 +40,7 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ],
     include_package_data=True,
-    data_files=[('templates', [f'simutools/template/{file}' for file in os.listdir('simutools/template') if not file.endswith('py')])]
+    data_files=[('templates', [f'simutools/template/amber/{file}' for file in os.listdir('simutools/template/amber') if not file.endswith('py')]
+                 + [f'simutools/template/gromacs/{file}' for file in os.listdir('simutools/template/gromacs') if not file.endswith('py')]
+                 + [f'simutools/template/plumed/{file}' for file in os.listdir('simutools/template/plumed') if not file.endswith('py')])]
 )
