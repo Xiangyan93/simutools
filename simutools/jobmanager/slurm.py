@@ -140,7 +140,7 @@ class Slurm:
         if exclusive:
             info += '#SBATCH --exclusive\n'
         if nodelist is not None:
-            info += '#SBATCH --nodelist=%s\n' % exclude
+            info += '#SBATCH --nodelist=%s\n' % nodelist
         if exclude is not None:
             info += '#SBATCH --exclude=%s\n' % exclude
         if qos is not None:
